@@ -1,0 +1,19 @@
+{
+  "restrictions": {
+    "allow_product_feedback": {
+      "allowed": false
+    },
+    "allow_remote_sessions": {
+      "allowed": false
+    },
+    "allow_remote_control": {
+      "allowed": false
+    },
+    "allow_quick_web_setup": {
+      "allowed": false
+    },
+    "enforce_web_search_mcp_isolation": {
+      "allowed": false
+    }
+  }
+}

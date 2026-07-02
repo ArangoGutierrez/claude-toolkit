@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ArangoGutierrez/claude-toolkit/cursor/schemas/state-file.schema.json",
+  "title": "Cursor State Files",
+  "description": "Schema for loop and context state files",
+  "definitions": {
+    "loopState": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["running", "stopped", "complete", "budget_exceeded"],
+          "description": "Current loop status"
+        },
+        "task": {
+          "type": "string",
+          "description": "Task description for the loop"
+        },
+        "max_iterations": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "Maximum iterations allowed"
+        },
+        "current_iteration": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Current iteration count"
+        },
+        "completion_promise": {
+          "type": "string",
+          "default": "DONE",
+          "description": "String to search for indicating completion"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the loop started"
+        },
+        "completed_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "When the loop completed"
+        }
+      },
+      "additionalProperties": false
+    },
+    "contextState": {
+      "type": "object",
+      "required": ["conversation_id", "iterations", "health"],
+      "properties": {
+        "conversation_id": {
+          "type": "string",
+          "description": "Cursor conversation identifier"
+        },
+        "started_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the session started"
+        },
+        "iterations": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of agent iterations"
+        },
+        "files_touched": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Files modified in this session"
+        },
+        "tasks_completed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of tasks marked DONE"
+        },
+        "summarize_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of times /summarize was detected"
+        },
+        "last_summarize_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "When last summarize was detected"
+        },
+        "health": {
+          "type": "string",
+          "enum": ["healthy", "filling", "critical", "degraded"],
+          "description": "Current context health state"
+        },
+        "last_recommendation": {
+          "type": ["string", "null"],
+          "description": "Last recommendation message given"
+        },
+        "stuck_iterations": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Consecutive iterations without progress"
+        },
+        "last_done_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Previous DONE count for stuck detection"
+        },
+        "last_todo_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Previous TODO count for stuck detection"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,10 @@
+---
+description: TypeScript/JavaScript standards
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx"]
+---
+# Node/TypeScript
+style:strict-TS|no-any|explicit-return-types
+pattern:async/await>callbacks|zod-for-validation|const>let>never-var
+error:typed-errors|never-swallow-catch|Error-subclass-for-domain
+test:vitest-or-jest|describe-blocks|mock-at-boundary-not-deep
+security:no-eval|sanitize-user-input|env-for-secrets|CSP-headers

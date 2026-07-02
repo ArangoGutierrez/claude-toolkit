@@ -1,0 +1,7 @@
+{ "skill": "kickoff",
+  "cases": [
+    { "id": "pos-rough-idea",   "prompt": "turn my rough idea about adding caching into a scoped task", "expect": "activate" },
+    { "id": "pos-kickoff-verb", "prompt": "kick off work on a new GPU scheduling feature",              "expect": "activate" },
+    { "id": "decoy-goal",       "prompt": "set my session goal to ship the parser",                     "expect": "silent", "note": "routes to goal, not kickoff" },
+    { "id": "decoy-question",   "prompt": "what does this bash regex match?",                            "expect": "silent" }
+  ] }

@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "hooks": {
+    "afterFileEdit": [
+      {
+        "command": "~/.cursor/hooks/format.sh",
+        "timeout": 5
+      }
+    ],
+    "beforeShellExecution": [
+      {
+        "command": "~/.cursor/hooks/sign-commits.sh"
+      },
+      {
+        "command": "~/.cursor/hooks/security-gate.sh",
+        "timeout": 10
+      }
+    ],
+    "stop": [
+      {
+        "command": "~/.cursor/hooks/task-loop.sh",
+        "loop_limit": 5
+      }
+    ]
+  }
+}

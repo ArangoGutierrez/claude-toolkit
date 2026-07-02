@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ArangoGutierrez/claude-toolkit/cursor/schemas/hooks.schema.json",
+  "title": "Cursor Hooks Configuration",
+  "description": "Schema for hooks.json configuration file",
+  "type": "object",
+  "required": ["version", "hooks"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Configuration schema version"
+    },
+    "hooks": {
+      "type": "object",
+      "properties": {
+        "afterFileEdit": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/hook" },
+          "description": "Hooks triggered after file edits"
+        },
+        "beforeShellExecution": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/hook" },
+          "description": "Hooks triggered before shell command execution"
+        },
+        "stop": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/stopHook" },
+          "description": "Hooks triggered on agent stop"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "hook": {
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "pattern": "^~/.cursor/hooks/[a-z-]+\\.sh$",
+          "description": "Path to hook script"
+        }
+      },
+      "additionalProperties": false
+    },
+    "stopHook": {
+      "type": "object",
+      "required": ["command"],
+      "properties": {
+        "command": {
+          "type": "string",
+          "pattern": "^~/.cursor/hooks/[a-z-]+\\.sh$",
+          "description": "Path to hook script"
+        },
+        "loop_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Maximum loop iterations before stopping"
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

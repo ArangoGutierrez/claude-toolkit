@@ -1,0 +1,36 @@
+name: Check Links
+
+on:
+  # Run weekly on Sunday at midnight
+  schedule:
+    - cron: '0 0 * * 0'
+  # Also run on PRs that touch docs
+  pull_request:
+    paths:
+      - '**.md'
+      - 'docs/**'
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  link-check:
+    name: Check Links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Check for broken links
+        uses: lycheeverse/lychee-action@8646ba30535128ac92d33dfc9133794bfdd9b411 # v2.8.0
+        with:
+          args: >-
+            --verbose
+            --no-progress
+            --accept 200,204,206,301,307,308,429
+            --timeout 30
+            --max-retries 3
+            --exclude 'https://your-webhook-url'
+            --exclude-path 'node_modules'
+            README.md
+            'docs/**/*.md'
+          fail: false
+        continue-on-error: true

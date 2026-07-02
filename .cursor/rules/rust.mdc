@@ -1,0 +1,11 @@
+---
+description: Rust standards
+globs: ["**/*.rs"]
+---
+# Rust
+style:clippy-clean|rustfmt|no-unsafe-unless-justified
+pattern:Result>panic|enum-for-state-machines|newtype-for-validation
+error:thiserror-for-library|anyhow-for-application|?-propagation
+lifetime:minimize-annotations|owned-in-API|borrow-internally
+test:cargo-test|#[cfg(test)]|proptest-for-invariants
+security:no-unwrap-in-production|audit-deps(cargo-audit)|no-unsafe-ffi-leaks

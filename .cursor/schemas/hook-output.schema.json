@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ArangoGutierrez/claude-toolkit/cursor/schemas/hook-output.schema.json",
+  "title": "Cursor Hook Output",
+  "description": "Schema for JSON output from hook scripts",
+  "oneOf": [
+    { "$ref": "#/definitions/allowResponse" },
+    { "$ref": "#/definitions/askResponse" },
+    { "$ref": "#/definitions/blockResponse" },
+    { "$ref": "#/definitions/modifyResponse" },
+    { "$ref": "#/definitions/followupResponse" },
+    { "$ref": "#/definitions/errorResponse" },
+    { "$ref": "#/definitions/emptyResponse" }
+  ],
+  "definitions": {
+    "allowResponse": {
+      "type": "object",
+      "required": ["continue", "permission"],
+      "properties": {
+        "continue": { "const": true },
+        "permission": { "const": "allow" }
+      },
+      "additionalProperties": false,
+      "description": "Allow command to proceed unchanged"
+    },
+    "askResponse": {
+      "type": "object",
+      "required": ["continue", "permission", "user_message", "agent_message"],
+      "properties": {
+        "continue": { "const": true },
+        "permission": { "const": "ask" },
+        "user_message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Message shown to user for confirmation"
+        },
+        "agent_message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Message shown to agent explaining the ask"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Ask user for confirmation before proceeding"
+    },
+    "blockResponse": {
+      "type": "object",
+      "required": ["continue"],
+      "properties": {
+        "continue": { "const": false },
+        "error": {
+          "type": "string",
+          "description": "Error message explaining why command was blocked"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Block command execution"
+    },
+    "modifyResponse": {
+      "type": "object",
+      "required": ["continue", "permission", "command"],
+      "properties": {
+        "continue": { "const": true },
+        "permission": { "const": "allow" },
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Modified command to execute instead"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Allow with modified command"
+    },
+    "followupResponse": {
+      "type": "object",
+      "required": ["followup_message"],
+      "properties": {
+        "followup_message": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Message to feed back to the agent"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Provide followup message to agent (stop hooks)"
+    },
+    "errorResponse": {
+      "type": "object",
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Error message"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Hook execution error"
+    },
+    "emptyResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "No action needed (stop hooks)"
+    }
+  }
+}

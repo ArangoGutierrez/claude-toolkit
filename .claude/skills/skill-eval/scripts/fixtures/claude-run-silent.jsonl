@@ -1,0 +1,4 @@
+{"type":"system","subtype":"init","session_id":"00000000-0000-0000-0000-000000000000","cwd":"/home/user/project","mcp_servers":[],"slash_commands":["day","goal","kickoff"],"skills":["day","goal","kickoff"],"model":"claude-sonnet-4-5","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"what is 2 + 2"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"4"}]}}
+{"type":"result","subtype":"success","is_error":false,"result":"4"}

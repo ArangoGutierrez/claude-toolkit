@@ -1,0 +1,8 @@
+{ "skill": "kickoff",
+  "cases": [
+    { "id": "pos-strong",     "expect": "activate", "runs": [["kickoff"],["kickoff"],["kickoff"],[],["kickoff"]] },
+    { "id": "pos-borderline", "expect": "activate", "runs": [["kickoff"],["kickoff"],[],[],[]] },
+    { "id": "decoy-clean",    "expect": "silent",   "runs": [[],[],["goal"],[],[]] },
+    { "id": "decoy-fires",    "expect": "silent",   "runs": [["kickoff"],["kickoff"],[],[],[]] },
+    { "id": "all-error",      "expect": "activate", "runs": [null,null,null,null,null] }
+  ] }

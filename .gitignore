@@ -1,0 +1,106 @@
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.settings/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+secrets.yaml
+
+# Logs
+*.log
+logs/
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build outputs
+dist/
+build/
+
+# Python generated
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Archives and backups
+*.tar.gz
+*.zip
+*.tar
+*.backup
+
+# Generated outputs
+AUDIT_REPORT.md
+ISSUE_RESEARCH.md
+*.generated.md
+.plans/
+.prototypes/
+
+# ── Claude Code runtime (never tracked) ──
+.claude/debug/
+.claude/projects/
+.claude/teams/
+.claude/tasks/
+.claude/todos/
+.claude/cache/
+.claude/file-history/
+.claude/session-env/
+.claude/shell-snapshots/
+.claude/paste-cache/
+.claude/telemetry/
+.claude/backups/
+.claude/ide/
+.claude/plans/
+.claude/history.jsonl
+.claude/stats-cache.json
+.claude/plugins/cache/
+.claude/plugins/known_marketplaces.json
+.claude/settings.local.json
+
+# Session goal + outcome runtime data (per-session goal files + outcomes log)
+.claude/audit/session-goals/
+.claude/audit/session-outcomes-*.log
+.claude/audit/otel-spans-*.jsonl
+
+# ── Cursor runtime (never tracked) ──
+.cursor/extensions/
+.cursor/projects/
+.cursor/ai-tracking/
+.cursor/snapshots/
+.cursor/ide_state.json
+.cursor/argv.json
+.cursor/unified_repo_list.json
+.cursor/worktrees/
+.cursor/blocklist
+.cursor/.deploy-version
+.cursor/docs/
+.cursor/skills/

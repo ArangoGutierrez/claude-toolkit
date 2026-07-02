@@ -1,0 +1,6 @@
+{"type":"system","subtype":"init","session_id":"00000000-0000-0000-0000-000000000000","cwd":"/home/user/project","mcp_servers":[],"slash_commands":["day","goal","kickoff"],"skills":["day","goal","kickoff"],"model":"claude-sonnet-4-5","permissionMode":"default"}
+{"type":"user","message":{"role":"user","content":[{"type":"text","text":"where am I in the flow"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Let me orient you."},{"type":"tool_use","id":"toolu_synthetic_0001","name":"Skill","input":{"skill":"day"}}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"toolu_synthetic_0001","content":"ok"}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"You are at the brainstorm stage."}]}}
+{"type":"result","subtype":"success","is_error":false,"result":"done"}

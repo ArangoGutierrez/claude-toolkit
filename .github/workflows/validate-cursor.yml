@@ -1,0 +1,312 @@
+name: Validate Cursor Config
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.cursor/**'
+      - '.github/workflows/validate-cursor.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.cursor/**'
+      - '.github/workflows/validate-cursor.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-structure:
+    name: Validate Cursor Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Validate hooks.json
+        run: |
+          echo "Validating hooks.json..."
+          if [ -f ".cursor/hooks.json" ]; then
+            if ! jq empty .cursor/hooks.json 2>/dev/null; then
+              echo "❌ .cursor/hooks.json is not valid JSON"
+              exit 1
+            fi
+
+            # Check required fields
+            if ! jq -e '.version' .cursor/hooks.json >/dev/null; then
+              echo "❌ Missing required field: version"
+              exit 1
+            fi
+            if ! jq -e '.hooks' .cursor/hooks.json >/dev/null; then
+              echo "❌ Missing required field: hooks"
+              exit 1
+            fi
+
+            # Validate hook commands reference existing files
+            for hook_path in $(jq -r '.. | .command? // empty' .cursor/hooks.json); do
+              # Convert ~/.cursor/hooks/x.sh to .cursor/hooks/x.sh for repo check
+              local_path="${hook_path/#~\/.cursor/.cursor}"
+              if [ ! -f "$local_path" ]; then
+                echo "❌ Hook references non-existent script: $hook_path"
+                exit 1
+              fi
+            done
+
+            echo "✅ hooks.json is valid"
+          else
+            echo "⚠️ hooks.json not found (optional)"
+          fi
+
+      - name: Validate hook scripts
+        run: |
+          echo "Validating hook scripts..."
+          ERRORS=0
+
+          for script in .cursor/hooks/*.sh; do
+            if [ ! -f "$script" ]; then
+              continue
+            fi
+
+            filename=$(basename "$script")
+            echo "Checking: $filename"
+
+            # Check shebang
+            if ! head -1 "$script" | grep -qE '^#!/bin/(ba)?sh'; then
+              echo "  ❌ Missing or invalid shebang"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  ✓ Valid shebang"
+            fi
+
+            # Check shell syntax
+            if ! bash -n "$script" 2>/dev/null; then
+              echo "  ❌ Shell syntax error"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  ✓ Valid shell syntax"
+            fi
+          done
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Found $ERRORS errors in hook scripts"
+            exit 1
+          fi
+          echo "✅ All hook scripts are valid"
+
+      - name: Validate agent frontmatter
+        run: |
+          echo "Validating agent files..."
+          ERRORS=0
+
+          for file in .cursor/agents/*.md; do
+            if [ ! -f "$file" ]; then
+              continue
+            fi
+
+            filename=$(basename "$file")
+            echo "Checking: $filename"
+
+            # Check for frontmatter
+            if ! head -1 "$file" | grep -q '^---$'; then
+              echo "  ❌ Missing frontmatter (must start with ---)"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            # Extract frontmatter between first and second '---' delimiters
+            frontmatter=$(awk '/^---$/{if(++count==2)exit;next}count==1' "$file")
+
+            if ! echo "$frontmatter" | grep -qE '^name:'; then
+              echo "  ❌ Missing required field: name"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  ✓ Has name field"
+            fi
+
+            if ! echo "$frontmatter" | grep -qE '^description:'; then
+              echo "  ❌ Missing required field: description"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  ✓ Has description field"
+            fi
+          done
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Found $ERRORS errors in agent files"
+            exit 1
+          fi
+          echo "✅ All agent files have valid frontmatter"
+
+      - name: Validate command structure
+        run: |
+          echo "Validating command files..."
+          WARNINGS=0
+
+          RECOMMENDED_SECTIONS=("## Usage" "## Workflow" "## Output" "## Constraints")
+
+          for file in .cursor/commands/*.md; do
+            if [ ! -f "$file" ]; then
+              continue
+            fi
+
+            filename=$(basename "$file")
+            echo "Checking: $filename"
+
+            for section in "${RECOMMENDED_SECTIONS[@]}"; do
+              if ! grep -qE "^$section" "$file"; then
+                echo "  ⚠️ Missing recommended: $section"
+                WARNINGS=$((WARNINGS + 1))
+              else
+                echo "  ✓ Has: $section"
+              fi
+            done
+          done
+
+          if [ $WARNINGS -gt 0 ]; then
+            echo "⚠️ Found $WARNINGS warnings (missing recommended sections)"
+          fi
+          echo "✅ All command files validated"
+
+      - name: Validate skill structure
+        run: |
+          echo "Validating skill files..."
+          ERRORS=0
+
+          for dir in .cursor/skills-cursor/*/; do
+            if [ ! -d "$dir" ]; then
+              continue
+            fi
+
+            skill_name=$(basename "$dir")
+            skill_file="${dir}SKILL.md"
+
+            echo "Checking skill: $skill_name"
+
+            if [ ! -f "$skill_file" ]; then
+              echo "  ❌ Missing SKILL.md file"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            if ! head -1 "$skill_file" | grep -q '^---$'; then
+              echo "  ❌ Missing frontmatter"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            frontmatter=$(sed -n '1,/^---$/p' "$skill_file" | tail -n +2 | head -n -1)
+
+            if ! echo "$frontmatter" | grep -qE '^name:'; then
+              echo "  ❌ Missing required field: name"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  ✓ Has name field"
+            fi
+
+            if ! echo "$frontmatter" | grep -qE '^description:'; then
+              echo "  ❌ Missing required field: description"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  ✓ Has description field"
+            fi
+          done
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Found $ERRORS errors in skill files"
+            exit 1
+          fi
+          echo "✅ All skill files have valid structure"
+
+      - name: Validate rules frontmatter
+        run: |
+          echo "Validating rule files..."
+          ERRORS=0
+
+          for file in .cursor/rules/*.mdc; do
+            if [ ! -f "$file" ]; then
+              continue
+            fi
+
+            filename=$(basename "$file")
+            echo "Checking: $filename"
+
+            # Check for frontmatter
+            if ! head -1 "$file" | grep -q '^---$'; then
+              echo "  ❌ Missing frontmatter"
+              ERRORS=$((ERRORS + 1))
+              continue
+            fi
+
+            # Extract frontmatter
+            frontmatter=$(sed -n '1,/^---$/p' "$file" | tail -n +2 | head -n -1)
+
+            if ! echo "$frontmatter" | grep -qE '^description:'; then
+              echo "  ❌ Missing required field: description"
+              ERRORS=$((ERRORS + 1))
+            else
+              echo "  ✓ Has description field"
+            fi
+
+            has_always=$(echo "$frontmatter" | grep -cE '^alwaysApply:' || true)
+            has_globs=$(echo "$frontmatter" | grep -cE '^globs:' || true)
+
+            if [ "$has_always" -eq 0 ] && [ "$has_globs" -eq 0 ]; then
+              echo "  ⚠️ Missing alwaysApply or globs (rule may not load)"
+            else
+              echo "  ✓ Has activation trigger"
+            fi
+          done
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Found $ERRORS errors in rule files"
+            exit 1
+          fi
+          echo "✅ All rule files have valid frontmatter"
+
+      - name: Check file naming conventions
+        run: |
+          echo "Checking file naming conventions..."
+          ERRORS=0
+
+          for file in .cursor/**/*.md .cursor/**/*.sh .cursor/**/*.mdc; do
+            if [ ! -f "$file" ]; then
+              continue
+            fi
+
+            filename=$(basename "$file")
+
+            if [[ "$filename" == *" "* ]]; then
+              echo "❌ File has spaces in name: $file"
+              ERRORS=$((ERRORS + 1))
+            fi
+
+            if [[ "$filename" != "SKILL.md" ]] && [[ "$filename" =~ [A-Z] ]]; then
+              echo "⚠️ File has uppercase letters: $file (prefer kebab-case)"
+            fi
+          done
+
+          if [ $ERRORS -gt 0 ]; then
+            echo "❌ Found $ERRORS naming convention errors"
+            exit 1
+          fi
+          echo "✅ File naming conventions OK"
+
+  validate-schemas:
+    name: Validate JSON Schemas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install ajv-cli
+        run: npm install -g ajv-cli@5.0.0 ajv-formats@3.0.1
+
+      - name: Validate hooks.json against schema
+        run: |
+          if [ -f ".cursor/schemas/hooks.schema.json" ] && [ -f ".cursor/hooks.json" ]; then
+            ajv validate -s .cursor/schemas/hooks.schema.json -d .cursor/hooks.json --strict=false
+            echo "✅ hooks.json validates against schema"
+          else
+            echo "⚠️ Schema or hooks.json not found, skipping validation"
+          fi

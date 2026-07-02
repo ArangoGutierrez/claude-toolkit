@@ -1,0 +1,7 @@
+{ "skill": "goal",
+  "cases": [
+    { "id": "pos-set-goal",   "prompt": "set my session goal to refactor the auth module", "expect": "activate" },
+    { "id": "pos-amend-goal", "prompt": "amend the session goal to include tests",          "expect": "activate" },
+    { "id": "decoy-kickoff",  "prompt": "turn this rough idea into a scoped plan",           "expect": "silent", "note": "routes to kickoff, not goal" },
+    { "id": "decoy-question", "prompt": "explain what a goroutine is",                        "expect": "silent" }
+  ] }

@@ -1,0 +1,10 @@
+---
+description: Kubernetes manifest standards
+globs: ["**/*.yaml", "**/*.yml", "**/k8s/**", "**/manifests/**", "**/deploy/**"]
+---
+# K8s
+api:feature-gates for alpha/beta|version-dependent→state assumptions
+manifest:resource limits req|probes req|configmap via env|secret via vol (mode 0400, not env)
+security:no plain secrets|RBAC minimal|network policies|pod security standards
+operator:reconcile idempotent|status subresource|finalizers for cleanup|leader election
+helm:values schema|README|upgrade path tested

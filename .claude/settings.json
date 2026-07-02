@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "respectGitignore": true,
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "includeGitInstructions": false,
+  "permissions": {
+    "allow": [
+      "Bash(go *)",
+      "Bash(git *)",
+      "Bash(make *)",
+      "Bash(kubectl *)",
+      "Bash(gh *)",
+      "Bash(kind *)",
+      "Bash(helm *)",
+      "Bash(kustomize *)",
+      "Bash(controller-gen *)",
+      "Bash(setup-envtest *)",
+      "Bash(golangci-lint *)",
+      "Bash(govulncheck *)",
+      "Bash(gosec *)",
+      "Bash(trivy *)",
+      "Bash(grype *)",
+      "Bash(npm *)",
+      "Bash(yarn *)",
+      "Bash(pnpm *)",
+      "Bash(jq *)",
+      "Bash(rg *)",
+      "Bash(* --version)",
+      "Bash(* --help)",
+      "Read(*)",
+      "WebSearch",
+      "mcp__github__*"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(**/secret*)",
+      "Read(**/credential*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(**/*id_rsa*)",
+      "Read(**/.ssh/*)",
+      "Read(**/.aws/*)",
+      "Read(**/.kube/config)",
+      "Read(**/*token*)",
+      "Read(**/*password*)",
+      "Edit(**/.env)",
+      "Edit(**/.env.*)",
+      "Write(**/.env)",
+      "Write(**/.env.*)",
+      "Write(**/*secret*)",
+      "Write(**/*credential*)",
+      "Write(**/*.pem)",
+      "Write(**/*.key)"
+    ],
+    "ask": [
+      "Bash(rm *)",
+      "Bash(rm -rf *)",
+      "Bash(git rebase *)",
+      "Bash(git reset --hard *)",
+      "Bash(git push --force *)",
+      "Bash(sudo *)"
+    ]
+  },
+  "model": "opus",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/inject-date.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/reflection-staleness.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/session-goal-init.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/sign-commits.sh",
+            "if": "Bash(git commit *)"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/prevent-push-workbench.sh",
+            "if": "Bash(git push *)"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/graphify-graph-hint.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Glob|Grep",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/graphify-graph-hint.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/enforce-worktree.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/validate-year.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/tdd-guard.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/enforce-worktree.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/tdd-guard.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/auto-format.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/test-quality-lint.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/bash-audit-log.sh"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/pre-compact-context.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "prompt",
+            "prompt": "Check if the assistant's last response claims work is complete, fixed, or passing. If it does, verify: did the assistant actually run a verification command (test, build, lint) and show the output BEFORE making the claim? If the claim is unverified, respond with 'STOP: You claimed completion without running verification. Run the relevant test/build command first.' Otherwise respond with 'OK'."
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/context-watch.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/verify-gate.sh"
+          }
+        ]
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/permission-denied.sh"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "code-review@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "clangd-lsp@claude-plugins-official": true
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": false
+  },
+  "effortLevel": "high",
+  "autoMemoryEnabled": true,
+  "teammateMode": "in-process",
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  }
+}

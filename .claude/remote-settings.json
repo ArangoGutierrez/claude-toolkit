@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "ask": [
+      "Bash(rm:*)",
+      "Bash",
+      "WebFetch"
+    ]
+  },
+  "sandbox": {
+    "network": {
+      "allowManagedDomainsOnly": true,
+      "allowedDomains": [
+        "github.com",
+        "*.github.com",
+        "raw.githubusercontent.com",
+        "*.github.io",
+        "claude.com",
+        "*.claude.com",
+        "docs.anthropic.com",
+        "api.anthropic.com",
+        "bazel.build",
+        "*.bazel.build",
+        "sum.golang.org",
+        "proxy.golang.org",
+        "go.dev",
+        "localhost",
+        "host.docker.internal",
+        "pypi.org",
+        "files.pythonhosted.org",
+        "repo1.maven.org",
+        "archive.ubuntu.com",
+        "security.ubuntu.com",
+        "docker.com",
+        "*.docker.com",
+        "api2.cursor.sh",
+        "deepwiki.com",
+        "googleapis.com",
+        "*.googleapis.com",
+        "cache.nixos.org",
+        "crates.io",
+        "*.crates.io",
+        "arxiv.org",
+        "docs.rs",
+        "std.rs",
+        "nvd.nist.gov"
+      ]
+    }
+  }
+}

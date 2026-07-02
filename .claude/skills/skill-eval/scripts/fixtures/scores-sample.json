@@ -1,0 +1,60 @@
+[
+  {
+    "skill": "kickoff",
+    "pass_threshold": 0.6,
+    "decoy_threshold": 0.2,
+    "cases": [
+      {
+        "id": "pos-strong",
+        "expect": "activate",
+        "attempts": 5,
+        "valid": 5,
+        "fired": 4,
+        "rate": 0.8,
+        "verdict": "PASS"
+      },
+      {
+        "id": "pos-borderline",
+        "expect": "activate",
+        "attempts": 5,
+        "valid": 5,
+        "fired": 2,
+        "rate": 0.4,
+        "verdict": "FAIL"
+      },
+      {
+        "id": "decoy-clean",
+        "expect": "silent",
+        "attempts": 5,
+        "valid": 5,
+        "fired": 0,
+        "rate": 0,
+        "verdict": "PASS"
+      },
+      {
+        "id": "decoy-fires",
+        "expect": "silent",
+        "attempts": 5,
+        "valid": 5,
+        "fired": 2,
+        "rate": 0.4,
+        "verdict": "FAIL"
+      },
+      {
+        "id": "all-error",
+        "expect": "activate",
+        "attempts": 5,
+        "valid": 0,
+        "fired": 0,
+        "rate": null,
+        "verdict": "ERROR"
+      }
+    ],
+    "summary": {
+      "total": 5,
+      "pass": 2,
+      "fail": 2,
+      "error": 1
+    }
+  }
+]

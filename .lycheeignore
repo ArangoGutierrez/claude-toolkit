@@ -1,0 +1,7 @@
+# Placeholder documentation URLs (not yet published)
+https://code.claude.com/.*
+https://agentskills.io.*
+
+# GitHub URLs that require authentication
+https://github.com/.*/pull/.*
+https://github.com/.*/issues/.*

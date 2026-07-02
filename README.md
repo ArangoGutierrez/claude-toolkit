@@ -64,7 +64,7 @@ steps, and a first-session walkthrough.
 | **CLAUDE.md** | 1 | Engineering standards (TDD, worktrees, iteration budgets) |
 | **settings.json** | 1 | Permissions, hook wiring, plugin config, environment |
 | **Hooks** | 19 | inject-date, sign-commits, prevent-push-workbench, enforce-worktree, validate-year, tdd-guard, auto-format, bash-audit-log, build-helpers, context-watch, mutation-gate, permission-denied, pre-compact-context, reflection-staleness, session-goal-init, test-dep-map, test-quality-lint, graphify-graph-hint, verify-gate |
-| **Skills** | 14 | eureka, go-review, goal, handoff, k8s-debug, kickoff, pr-review-ingest, reflection, skill-eval, tdd-protocol, team-{plan,execute,shutdown}, worktree-guide |
+| **Skills** | 14 | eureka, go-review, goal, handoff, k8s-debug, kickoff, pr-review-ingest, reflection, skill-eval, tdd-protocol, team-{plan,execute,shutdown}, worktree-guide — each ships a human-facing README; see the [Skills & Commands reference](docs/skills-and-commands.md) |
 | **Rules** | 8 | constitution, go/k8s/container conventions, git-workflow, security, graphify, learned-anti-patterns |
 | **Agents** | 4 | doc-writer, explorer, principal-engineer, qa-engineer |
 | **Commands** | 3 | team-plan, team-execute, team-shutdown (multi-agent coordination) |
@@ -127,8 +127,8 @@ pipx install graphify             # one-time
 ## Requirements
 
 - **macOS or Linux** (Windows/WSL untested)
-- **Claude Code** (required — https://docs.anthropic.com/claude-code)
-- **Cursor** (required for Cursor config — https://cursor.com)
+- **Claude Code** (required — <https://docs.anthropic.com/claude-code>)
+- **Cursor** (required for Cursor config — <https://cursor.com>)
 - **jq** (for hooks that parse JSON)
 - **GPG** (for signed commits)
 - **rsync** (for deploy/capture scripts)

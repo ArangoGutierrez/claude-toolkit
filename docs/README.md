@@ -17,4 +17,3 @@ Welcome to the AI Engineering Dotfiles documentation. This repo configures [Clau
 | [Cursor Configuration](cursor.md) | Agents, commands, rules, and hooks |
 | [Deployment Scripts](deployment.md) | deploy.sh, capture.sh, and diff.sh explained |
 | [Skills & Commands Reference](skills-and-commands.md) | Complete reference of all slash commands and skills |
-

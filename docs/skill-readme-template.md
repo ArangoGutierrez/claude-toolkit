@@ -13,37 +13,59 @@ invocation and the outcome a user should expect.
 ```markdown
 # /<name> — <one-line tagline>
 
-<1–2 sentences: what it does and the value it delivers. Name the trigger
-(`/<name> <args>`) and any fail-open / safety behavior.>
+<1–2 sentences: what it does and the value it delivers. This opening
+paragraph IS the "purpose" — do not add a `## Purpose` heading. Name the
+trigger (e.g. `/<name> <args>`) and any fail-open / safety behavior.>
 
 ## When to use it
+
 <3–6 bullets of concrete situations — the problems it solves and the
-triggers. Pair with "When NOT to use it" if there's a common mis-reach.>
+triggers. End with a `**Not for:**` bullet naming the common mis-reach and
+where that work should go instead (most of these skills have a near-neighbor).>
 
 ## Examples
-<2–3 worked examples. Each = the invocation, then what happens / the
-expected outcome. Prefer a real transcript snippet over prose.>
+
+<2–3 worked examples. Each is the invocation, then what happens / the
+expected outcome. Use a 4-space-indented block with a literal `>` line for
+the command and a `→` line for the observable result — not prose, not a
+fenced block.>
 
     > /<name> <concrete args>
     → <what the skill produces / the observable result>
 
 ## Setup
-<Only if non-trivial: env vars (names only, never secret values), deploy
-step, dependencies. Omit this section entirely if there's nothing to set up.>
+
+<Only if non-trivial: env var NAMES (never values), deploy step,
+dependencies. Show placeholders for any host/key (`https://your-endpoint`,
+`$YOUR_API_KEY`). Omit this section entirely if there's nothing to set up.>
 
 ## Notes
+
 <Gotchas, failure modes, related skills (link them), and a pointer back to
-the central reference. Keep to what a user actually needs.>
+the index. Keep to what a user actually needs.>
 ```
 
 ## Rules
-- **World-safe** (this repo is public): no internal hostnames, tokens, or
-  private paths in examples. Use placeholders (`https://your-endpoint`,
+
+- **Title & slash prefix**: use `# /<name> — <tagline>` only if the skill is
+  user-invocable as a slash command; for auto-triggered skills use
+  `# <name> — <tagline>` with no slash. Every title carries a tagline.
+- **World-safe** (this repo is public): no internal hostnames, model ids,
+  employer-specific references, tokens, or private paths (never
+  `/Users/<you>/…` — use `~/…`). Use placeholders (`https://your-endpoint`,
   `$YOUR_API_KEY`).
-- **Examples must be real**: every example reflects actual behavior — run it
-  if unsure. Don't invent output.
+- **Examples must be real**: every example and any command you cite (a
+  `Verify:` line, a test invocation) must reflect actual behavior and point
+  at a file that exists — run it if unsure. Don't invent output.
 - **Don't duplicate `SKILL.md`**: the README explains *use*; the SKILL.md
   defines the *procedure*. Link, don't copy.
-- **One screen where possible**: a reader should grasp purpose + an example
-  without scrolling for minutes.
-```
+- **Plain and technical**: no emoji, no marketing adjectives ("powerful",
+  "seamless", "effortless", "revolutionary"). Imperative or second person.
+- **One screen**: target ~40–90 lines; a reader should grasp purpose + an
+  example without scrolling for minutes.
+- **Links**: a skill README sits at `.claude/skills/<name>/README.md`, so the
+  index is three levels up — link it with code-styled text:
+  ``[`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md)``.
+  Link a sibling skill as ``[`<other>`](../<other>/)``; mention
+  superpowers-plugin skills as plain code spans (`superpowers:<name>`), never
+  as links.

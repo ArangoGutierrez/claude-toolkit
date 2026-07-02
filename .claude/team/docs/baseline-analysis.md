@@ -16,13 +16,16 @@ Analysis of agent behavior WITHOUT the team coordination skill.
 ## Key Patterns Identified
 
 ### Pattern 1: Generic Teams Without Roles
+
 **Observation:** When creating teams, agents spawn generic "feature agents" or "worker agents" without specialized roles.
 
 **Verbatim examples:**
+
 - "4 Teammate Agents - each gets dedicated worktree"
 - "Profile Agent, Notification Agent, Export Agent, Dashboard Agent"
 
 **Missing:**
+
 - No Systems Architect role for architectural decisions
 - No QA Agent role for testing and quality gates
 - Workers aren't distinguished as "workers reporting to Architect/QA"
@@ -32,13 +35,16 @@ Analysis of agent behavior WITHOUT the team coordination skill.
 ---
 
 ### Pattern 2: Good Escalation Instinct, Unclear Target
+
 **Observation:** When hitting architectural decisions, agents DO recognize need to escalate.
 
 **Verbatim examples:**
+
 - "I would ask the team lead or architect"
 - "Request review from teammate (code reviewer agent or team lead)"
 
 **Missing:**
+
 - They don't assume Architect/QA roles exist as part of team structure
 - They're guessing who to ask ("or" indicates uncertainty)
 - No clear communication protocol
@@ -48,14 +54,17 @@ Analysis of agent behavior WITHOUT the team coordination skill.
 ---
 
 ### Pattern 3: No Wave Management Concept
+
 **Observation:** When faced with >5 agents needed, agents create "optimal number" without wave concept.
 
 **Verbatim examples:**
+
 - "4 Parallel Teammates + 1 Lead" for 8 tasks
 - No mention of sequential waves
 - No mention of 5-agent maximum
 
 **Missing:**
+
 - No concept of "Wave 1 (tasks 1-4), Wave 2 (tasks 5-8)"
 - No mention of keeping Architect/QA constant across waves
 - No plan for wave transitions
@@ -65,14 +74,17 @@ Analysis of agent behavior WITHOUT the team coordination skill.
 ---
 
 ### Pattern 4: Partial Cleanup
+
 **Observation:** Agents recognize need for worktree cleanup but not team shutdown.
 
 **Verbatim examples:**
+
 - "Remove completed worktrees"
 - "Update AGENTS.md to reflect completed work"
 - "Run /compact after major task"
 
 **Missing:**
+
 - No mention of TeamDelete
 - No mention of shutting down teammate agents
 - No mention of full team teardown
@@ -82,9 +94,11 @@ Analysis of agent behavior WITHOUT the team coordination skill.
 ---
 
 ### Pattern 5: Good Judgment on When NOT to Use Teams
+
 **Observation:** Agents correctly identify trivial tasks don't need teams ✅
 
 **Verbatim examples:**
+
 - "No. Absolutely not." (for typo fix)
 - "Using a team would be massive overhead for a one-word fix"
 
@@ -93,9 +107,11 @@ Analysis of agent behavior WITHOUT the team coordination skill.
 ---
 
 ### Pattern 6: Agents-Workbench Integration Works
+
 **Observation:** Agents naturally use agents-workbench workflow from CLAUDE.md ✅
 
 **Verbatim examples:**
+
 - "Stay on agents-workbench branch"
 - "Each teammate gets dedicated worktree"
 - "Update AGENTS.md for task tracking"

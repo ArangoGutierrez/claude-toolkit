@@ -5,6 +5,7 @@ Run these scenarios WITHOUT the skill to establish baseline behavior.
 ## Scenario 1: Multi-Task Implementation (Clear Team Case)
 
 **Prompt:**
+
 ```
 I need to implement these features for tomorrow's demo:
 1. User profile editing with avatar upload
@@ -16,6 +17,7 @@ These are independent features. Can you help?
 ```
 
 **Expected (ideal):**
+
 - Recognize need for team (4 independent tasks)
 - Create: 1 Architect + 1 QA + 2-3 Workers
 - Use agents-workbench for coordination
@@ -24,6 +26,7 @@ These are independent features. Can you help?
 - Architect available for design questions
 
 **What we're testing:**
+
 - Do they create team at all?
 - Do they create proper structure (Architect/QA/Workers)?
 - Or just generic "teammate1, teammate2"?
@@ -36,15 +39,18 @@ These are independent features. Can you help?
 ## Scenario 2: Simple Bug Fix (Should NOT Use Team)
 
 **Prompt:**
+
 ```
 There's a typo in the user registration form - the email field label says "Emial" instead of "Email". Can you fix it?
 ```
 
 **Expected (ideal):**
+
 - Work solo (trivial fix)
 - No team needed
 
 **What we're testing:**
+
 - Do they over-apply team structure?
 - "When I have a hammer, everything looks like a nail"
 
@@ -57,6 +63,7 @@ There's a typo in the user registration form - the email field label says "Emial
 **Setup:** First run Scenario 1 to create team
 
 **Prompt (to a worker agent):**
+
 ```
 For the user profile editing feature, should we:
 A) Store avatars in database as BLOBs
@@ -67,10 +74,12 @@ What do you think?
 ```
 
 **Expected (ideal):**
+
 - Worker escalates to Architect: "I need architectural guidance on storage approach"
 - Worker does NOT decide independently
 
 **What we're testing:**
+
 - Do workers recognize when to ask Architect?
 - Or do they make architectural decisions on their own?
 
@@ -83,16 +92,19 @@ What do you think?
 **Setup:** First run Scenario 1 to create team
 
 **Prompt (to a worker who just finished implementing):**
+
 ```
 I've finished implementing the CSV export feature. The code is ready. What's next?
 ```
 
 **Expected (ideal):**
+
 - Worker reports to QA: "CSV export complete, ready for review and testing"
 - Worker waits for QA feedback
 - Worker does NOT merge/deploy independently
 
 **What we're testing:**
+
 - Do workers coordinate with QA?
 - Or do they skip review and move on?
 
@@ -103,6 +115,7 @@ I've finished implementing the CSV export feature. The code is ready. What's nex
 ## Scenario 5: Wave Management (>5 Agents)
 
 **Prompt:**
+
 ```
 We need to implement 8 new API endpoints with tests:
 1. /api/users/search
@@ -118,12 +131,14 @@ All independent, all needed by Friday.
 ```
 
 **Expected (ideal):**
+
 - Recognize 8 tasks > 5 agents max
 - Plan waves: Wave 1 (endpoints 1-4), Wave 2 (endpoints 5-8)
 - Keep Architect + QA throughout both waves
 - Rotate workers
 
 **What we're testing:**
+
 - Do they plan waves?
 - Or try to spawn 8+ agents?
 - Or work sequentially without team?
@@ -137,17 +152,20 @@ All independent, all needed by Friday.
 **Setup:** After completing any team-based scenario
 
 **Prompt:**
+
 ```
 Great work! The features are done and tested. Let's move on to the next project - we need to update the documentation.
 ```
 
 **Expected (ideal):**
+
 - Shut down team properly (TeamDelete or equivalent)
 - Clean up agents-workbench coordination files
 - Remove worktrees if needed
 - Only then start new work
 
 **What we're testing:**
+
 - Do they remember cleanup?
 - Or leave team infrastructure hanging?
 

@@ -127,8 +127,8 @@ pipx install graphify             # one-time
 ## Requirements
 
 - **macOS or Linux** (Windows/WSL untested)
-- **Claude Code** (required — https://docs.anthropic.com/claude-code)
-- **Cursor** (required for Cursor config — https://cursor.com)
+- **Claude Code** (required — <https://docs.anthropic.com/claude-code>)
+- **Cursor** (required for Cursor config — <https://cursor.com>)
 - **jq** (for hooks that parse JSON)
 - **GPG** (for signed commits)
 - **rsync** (for deploy/capture scripts)

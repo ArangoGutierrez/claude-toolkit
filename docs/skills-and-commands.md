@@ -75,13 +75,13 @@ These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each h
 | [`/team-shutdown`](../.claude/skills/team-shutdown/README.md) | Retire a completed team engagement |
 | [`/worktree-guide`](../.claude/skills/worktree-guide/README.md) | Branch model and commands for agents-workbench worktrees |
 
-The three `team-*` skills are also exposed as slash commands in `.claude/commands/` — same content, user-invocable entry points. The next section describes the team lifecycle they implement.
+The three `team-*` skills are also exposed as slash commands in `.claude/commands/`. Note the two copies have drifted: the command files predate the skills' current form (they still use the "Distinguished Systems Engineer" role name and `team/lib/architect-*.md` reference paths, where the skills use "Principal Engineer" and `.claude/agents/*.md`). The SKILL.md trio is the source of truth for the process; reconciling the command copies is a tracked follow-up. The next section documents the commands as they currently exist.
 
 ---
 
 ## Claude Code Team Commands
 
-These are slash commands in `.claude/commands/` that coordinate multi-agent team workflows. They are invoked as `/team-plan`, `/team-execute`, and `/team-shutdown`. Each command defines a phase of the team lifecycle.
+These are slash commands in `.claude/commands/` that coordinate multi-agent team workflows. They are invoked as `/team-plan`, `/team-execute`, and `/team-shutdown`. Each command defines a phase of the team lifecycle. (The command files lag the `team-*` skills — see the note in the previous section; the per-skill READMEs describe the current process.)
 
 ### Team Structure
 

@@ -4,13 +4,13 @@
 check that a skill fires on the prompts that should trigger it and stays silent
 on near-neighbor decoys, then emits a pass/fail scorecard. It measures
 *discoverability* (routing), not output correctness. A non-zero exit means at
-least one case FAILed or ERRORed, so it doubles as a CI gate.
+least one case ended in FAIL or ERROR, so it doubles as a CI gate.
 
 ## When to use it
 
 - After editing a skill's `description`, to confirm it still activates on real
   prompts and hasn't started swallowing near-neighbor ones.
-- To catch mis-trigger regressions across the whole set — run with no args to
+- To catch false-fire regressions across the whole set — run with no args to
   score every skill that ships an `evals.json`.
 - To tune a decoy that keeps firing or a positive case that keeps missing.
 - **Not for:** checking whether a skill's *output* is correct, or running
@@ -21,7 +21,7 @@ least one case FAILed or ERRORed, so it doubles as a CI gate.
     > /skill-eval
     → probes every skill that has an evals.json (N attempts per case); prints a
       Markdown scorecard (also written to .out/scorecard.md + .out/scores.json).
-      Exit is non-zero if any case FAILs or ERRORs.
+      Exit is non-zero if any case reports FAIL or ERROR.
 
     > /skill-eval kickoff goal
     → scores just those two skills — activation rate for each positive case and

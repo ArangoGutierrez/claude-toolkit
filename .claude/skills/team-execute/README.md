@@ -19,9 +19,9 @@ PRs).
   promoted to ready-for-review.
 - You're starting a later wave of the same project — the Principal Engineer
   and QA persist across waves, only Workers rotate.
-- **Not for:** a project with no plan yet — run `team-plan` first, this skill
-  refuses without one. Not for single-file fixes — use the superpowers
-  `test-driven-development` skill directly instead of spinning up a team.
+- **Not for:** a project with no plan yet (run `team-plan` first — this skill
+  refuses without one), nor single-file fixes — use
+  `superpowers:test-driven-development` directly instead of spinning up a team.
 
 ## Examples
 
@@ -54,4 +54,6 @@ startup live in `.claude/agents/principal-engineer.md` and
   `/team-execute` slash command and this auto-triggerable skill.
 - Related: [`team-plan`](../team-plan/) (writes the plan this skill consumes),
   [`team-shutdown`](../team-shutdown/) (tears down agents and worktrees when
-  done). Index: [docs/skills-and-commands.md](../../../docs/skills-and-commands.md).
+  done), [`worktree-guide`](../worktree-guide/) (the agents-workbench branch
+  model). Index:
+  [`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md).

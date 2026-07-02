@@ -35,10 +35,13 @@ protocol, it doesn't touch git state on its own.
 
 ## Notes
 
-- `enforce-worktree.sh` blocks writes to source code on `agents-workbench`;
-  the allowed exceptions are `AGENTS.md`, `.agents/*`, `.worktrees/*`,
-  `docs/plans/*`, `CLAUDE.md`, `.cursor/rules/*`, and `.gitignore`. A blocked
-  write there is expected behavior — move the work into a worktree instead.
+- `enforce-worktree.sh` blocks writes to source code on `agents-workbench`,
+  allowing only coordination files: `AGENTS.md`, `.agents/*`, `.worktrees/*`,
+  `docs/plans/*`, `docs/audits/*`, `docs/design-languages/*`, `CLAUDE.md`,
+  `.claudeignore`, `.gitignore`, and the Cursor equivalents (`.cursor/rules/*`,
+  `.cursor/AGENTS.md`, `.cursorrules`) — the hook's `case` block is the
+  authoritative list. A blocked write there is expected behavior — move the
+  work into a worktree instead.
 - `prevent-push-workbench.sh` blocks pushing `agents-workbench` to any
   remote; it's meant to stay a local-only coordination branch.
 - Related: [`team-plan`](../team-plan/), [`team-execute`](../team-execute/).

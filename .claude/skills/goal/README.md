@@ -15,7 +15,7 @@ stderr and the input is written anyway (soft rollout, not enforcement).
   appends a new stanza rather than overwriting the original.
 - You want the working directory's git origin recorded alongside the goal,
   so a statusline or later check can flag a cwd-vs-goal mismatch.
-- **Not for** turning a vague idea into a scoped task — `/kickoff` does that
+- **Not for:** turning a vague idea into a scoped task — `/kickoff` does that
   and sets the goal for you; call `/goal` directly only once you already
   know the goal.
 

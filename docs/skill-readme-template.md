@@ -64,6 +64,8 @@ the index. Keep to what a user actually needs.>
 - **One screen**: target ~40–90 lines; a reader should grasp purpose + an
   example without scrolling for minutes.
 - **Links**: a skill README sits at `.claude/skills/<name>/README.md`, so the
-  index is three levels up:
-  `[docs/skills-and-commands.md](../../../docs/skills-and-commands.md)`.
-  Link a sibling skill as `[<other>](../<other>/)`.
+  index is three levels up — link it with code-styled text:
+  ``[`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md)``.
+  Link a sibling skill as ``[`<other>`](../<other>/)``; mention
+  superpowers-plugin skills as plain code spans (`superpowers:<name>`), never
+  as links.

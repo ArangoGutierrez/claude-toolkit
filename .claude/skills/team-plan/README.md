@@ -35,8 +35,8 @@ updates `AGENTS.md`. It only produces a plan — no agents are spawned until
     > /team-plan add a health-check endpoint to the metrics service
     → Decomposes into two tasks — too few for wave planning — so the plan
       skips the Wave Plan section; you pick "single branch" and the output
-      covers Task List, Risk Register, Branch Strategy, Dependencies Map,
-      and Success Criteria.
+      covers Project Objective, Task List, Risk Register, Branch Strategy,
+      Dependencies Map, and Success Criteria.
 
     > /team-plan migrate the billing service to the new event bus
     → `agents-workbench` is 60 commits behind the default branch, past the
@@ -57,7 +57,8 @@ No environment variables.
 - Mandatory spawn order in the next phase is Principal Engineer, then QA,
   then up to 3 Workers (5 agents max); more than 3 tasks means waves, with
   the Principal Engineer and QA persisting across all of them.
-- Siblings: [`team-execute`](../team-execute/) spawns the team from this
+- Related: [`team-execute`](../team-execute/) spawns the team from this
   plan; [`team-shutdown`](../team-shutdown/) tears it down once PRs are
-  merged or abandoned. Index:
+  merged or abandoned; [`worktree-guide`](../worktree-guide/) explains the
+  agents-workbench branch model. Index:
   [`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md).

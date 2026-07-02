@@ -41,4 +41,4 @@ directly via its `Bash` tool permission. No other configuration.
 - Won't redesign architecture or suggest premature optimization during a review —
   it flags issues within the existing pattern, not a rewrite.
 - Pairs well with `superpowers:requesting-code-review` once findings are fixed.
-- Index: [docs/skills-and-commands.md](../../../docs/skills-and-commands.md).
+- Index: [`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md).

@@ -15,7 +15,7 @@ blocked.
 - You want the session **goal + acceptance checklist** planted automatically so
   a later Stop/verification hook can check whether verification actually ran.
 - You want the right skills **routed** for you instead of remembering which to invoke.
-- **Not** for a task you've already scoped — call `/goal` + the implementation
+- **Not for:** a task you've already scoped — call `/goal` + the implementation
   skill directly; `/kickoff` is the front door, not a required step.
 
 ## Examples
@@ -62,7 +62,7 @@ is not deployed, `/kickoff` simply passes your idea through (no enrichment).
   opening-prompt block for a fan-out/conductor skill, which falls back to its own
   static template if enrich is absent or returns `KICKOFF_PASSTHROUGH:` — a soft,
   fail-open dependency.
-- **Verify:** `bash .claude/skills/kickoff/scripts/enrich_test.sh < /dev/null`
+- Verify: `bash .claude/skills/kickoff/scripts/enrich_test.sh < /dev/null`
   (the discriminating tests need no network and no engine deployment).
 - Related: [`goal`](../goal/), `superpowers:brainstorming`. Index:
   [`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md).

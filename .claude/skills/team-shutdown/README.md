@@ -44,6 +44,7 @@ through if PRs are still open — it warns and asks for confirmation instead.
 - Order matters: TeamDelete runs before worktree removal, never after —
   leftover team infrastructure wastes resources and pollutes context.
 - Final step is `/compact Focus on next task` for context hygiene.
-- Part of the team trio: [`team-plan`](../team-plan/) plans the work,
-  [`team-execute`](../team-execute/) runs it, `team-shutdown` closes it out.
+- Related: [`team-plan`](../team-plan/) plans the work,
+  [`team-execute`](../team-execute/) runs it, `team-shutdown` closes it out;
+  [`worktree-guide`](../worktree-guide/) explains the agents-workbench model.
   Index: [`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md).

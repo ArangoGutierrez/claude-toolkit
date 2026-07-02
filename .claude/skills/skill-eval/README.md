@@ -55,8 +55,9 @@ the `claude` CLI and `jq` on `PATH`, and an `evals.json` in each evaluated skill
 - All ERROR verdicts → the `claude` invocation itself is failing; run one probe
   manually to see why. Decoys always firing → tighten the skill's negative
   scope in its `description`.
-- Run the harness's own tests with:
+- Verify:
   `for t in .claude/skills/skill-eval/scripts/*_test.sh .claude/skills/skill-eval/tests/*_test.sh; do bash "$t" < /dev/null; done`
   (they need a writable `$TMPDIR` under a restrictive sandbox).
-- Related: [`writing-skills`](../../../docs/skills-and-commands.md). Index:
+- Related: `superpowers:writing-skills` (authoring the descriptions this
+  harness scores). Index:
   [`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md).

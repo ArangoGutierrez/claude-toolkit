@@ -2,13 +2,14 @@
 
 `/kickoff <rough idea>` compiles a vague task opener into a **scoped prompt**, a
 list of **applicable skills**, and a **verification checklist** via a cheap
-tool-calling LLM that **inspects the repo** (multi-turn, read-only tools), then sets the
+tool-calling LLM that inspects the repo (multi-turn, read-only tools), then sets the
 session goal and drops you into brainstorming — one command instead of `/goal` +
 brainstorming. It is **fail-open**: if the engine is unavailable or the model
 cannot be reached, your raw idea flows through untouched and the kickoff is never
 blocked.
 
 ## When to use it
+
 - You have a half-formed idea ("explore X", "could we build Y?") and want it
   sharpened into a concrete, verifiable task before you start.
 - You want the session **goal + acceptance checklist** planted automatically so
@@ -53,6 +54,7 @@ Without `PANEL_DA_API_KEY` set, or if the engine module (`~/.claude/tool/kickoff
 is not deployed, `/kickoff` simply passes your idea through (no enrichment).
 
 ## Notes
+
 - **Sandbox:** Run with the sandbox **disabled** — the engine reaches your
   inference endpoint and reads repo files via read-only tools (multi-turn agentic
   flow). `enrich.sh` will not block if the sandbox prevents it; it fails open.

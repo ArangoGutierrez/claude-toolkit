@@ -1,31 +1,37 @@
-# skill-eval
+# /skill-eval — measure skill discoverability
 
-Discoverability harness for agent skills. Each skill ships an `evals.json` with
-positive and decoy prompts; `skill-eval.sh` probes real `claude` activation N
-times per case and scores activation/false-fire rates against thresholds.
+`/skill-eval [skill ...]` probes real `claude` activation N times per prompt to
+check that a skill fires on the prompts that should trigger it and stays silent
+on near-neighbor decoys, then emits a pass/fail scorecard. It measures
+*discoverability* (routing), not output correctness. A non-zero exit means at
+least one case FAILed or ERRORed, so it doubles as a CI gate.
 
-Adopts a per-skill evaluation pattern (a "discoverability" dimension),
-scoped to a single agent and measured against real activation.
+## When to use it
 
-## Usage
+- After editing a skill's `description`, to confirm it still activates on real
+  prompts and hasn't started swallowing near-neighbor ones.
+- To catch mis-trigger regressions across the whole set — run with no args to
+  score every skill that ships an `evals.json`.
+- To tune a decoy that keeps firing or a positive case that keeps missing.
+- **Not for:** checking whether a skill's *output* is correct, or running
+  skills for their side effects — this only measures whether they activate.
 
-```bash
-.claude/skills/skill-eval/scripts/skill-eval.sh            # all skills with evals.json
-.claude/skills/skill-eval/scripts/skill-eval.sh kickoff goal
-```
+## Examples
 
-Run from the repo root so `.claude/skills/` is discoverable. Output: a Markdown
-scorecard on stdout (and `.out/scorecard.md` + `.out/scores.json`); exit code is
-non-zero if any case FAILs or ERRORs.
+    > /skill-eval
+    → probes every skill that has an evals.json (N attempts per case); prints a
+      Markdown scorecard (also written to .out/scorecard.md + .out/scores.json).
+      Exit is non-zero if any case FAILs or ERRORs.
 
-| Env | Default | Meaning |
-|---|---|---|
-| `SKILL_EVAL_N` | 5 | attempts per case |
-| `SKILL_EVAL_PASS` | 0.6 | min activation rate for a positive case |
-| `SKILL_EVAL_DECOY` | 0.2 | max false-fire rate for a decoy case |
-| `CLAUDE_MODEL` | claude-haiku-4-5-20251001 | probe model |
+    > /skill-eval kickoff goal
+    → scores just those two skills — activation rate for each positive case and
+      false-fire rate for each decoy — against the pass/decoy thresholds.
 
-## eval schema
+## Setup
+
+Run from the repo root so `.claude/skills/` is discoverable (the runner is
+`.claude/skills/skill-eval/scripts/skill-eval.sh` for direct/CI use). Requires
+the `claude` CLI and `jq` on `PATH`, and an `evals.json` in each evaluated skill:
 
 ```json
 { "skill": "kickoff",
@@ -35,13 +41,22 @@ non-zero if any case FAILs or ERRORs.
   ] }
 ```
 
-## Running the tests
+| Env | Default | Meaning |
+|---|---|---|
+| `SKILL_EVAL_N` | 5 | attempts per case |
+| `SKILL_EVAL_PASS` | 0.6 | min activation rate for a positive case |
+| `SKILL_EVAL_DECOY` | 0.2 | max false-fire rate for a decoy case |
+| `CLAUDE_MODEL` | claude-haiku-4-5-20251001 | probe model |
 
-Bash `*_test.sh` live beside the scripts (plus `tests/skill-structure_test.sh`):
+## Notes
 
-```bash
-for t in .claude/skills/skill-eval/scripts/*_test.sh .claude/skills/skill-eval/tests/*_test.sh; do bash "$t" < /dev/null; done
-```
-
-The suites use here-strings and `mktemp`; under a restrictive sandbox they need a
-writable `$TMPDIR` (or run sandbox-disabled).
+- Headless activation is a proxy for interactive routing — treat scores as a
+  signal, not proof.
+- All ERROR verdicts → the `claude` invocation itself is failing; run one probe
+  manually to see why. Decoys always firing → tighten the skill's negative
+  scope in its `description`.
+- Run the harness's own tests with:
+  `for t in .claude/skills/skill-eval/scripts/*_test.sh .claude/skills/skill-eval/tests/*_test.sh; do bash "$t" < /dev/null; done`
+  (they need a writable `$TMPDIR` under a restrictive sandbox).
+- Related: [`writing-skills`](../../../docs/skills-and-commands.md). Index:
+  [`docs/skills-and-commands.md`](../../../docs/skills-and-commands.md).

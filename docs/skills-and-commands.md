@@ -54,6 +54,31 @@ These skills are provided by the superpowers plugin and live in the Claude Code 
 
 ---
 
+## Local Claude Code Skills (this repo)
+
+These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each has a human-facing README following the standard in [skill-readme-template.md](skill-readme-template.md) — what it does, when to use it, worked examples, setup, and gotchas. The `SKILL.md` beside each README is the machine-facing procedure the agent follows; the README explains *use*, the SKILL.md owns the *procedure*.
+
+| Skill | What it does |
+|-------|--------------|
+| [`/eureka`](../.claude/skills/eureka/README.md) | Capture a breakthrough before it evaporates |
+| [`/go-review`](../.claude/skills/go-review/README.md) | Systematic Go code review for correctness, concurrency, and performance |
+| [`/goal`](../.claude/skills/goal/README.md) | Record the session goal and acceptance criteria |
+| [`/handoff`](../.claude/skills/handoff/README.md) | Capture session state for a fresh start |
+| [`/k8s-debug`](../.claude/skills/k8s-debug/README.md) | Ordered triage for Kubernetes GPU workload failures |
+| [`/kickoff`](../.claude/skills/kickoff/README.md) | Turn a rough idea into a scoped, goal-tracked start |
+| [`/pr-review-ingest`](../.claude/skills/pr-review-ingest/README.md) | Turn PR review comments into rule proposals |
+| [`/reflection`](../.claude/skills/reflection/README.md) | Turn session mistakes into curated rules |
+| [`/skill-eval`](../.claude/skills/skill-eval/README.md) | Measure skill discoverability |
+| [`/tdd-protocol`](../.claude/skills/tdd-protocol/README.md) | The Red → Green → Mutate → Refactor cycle |
+| [`/team-plan`](../.claude/skills/team-plan/README.md) | Scope a multi-task project before spawning an agent team |
+| [`/team-execute`](../.claude/skills/team-execute/README.md) | Spawn the agent team to implement an approved plan |
+| [`/team-shutdown`](../.claude/skills/team-shutdown/README.md) | Retire a completed team engagement |
+| [`/worktree-guide`](../.claude/skills/worktree-guide/README.md) | Branch model and commands for agents-workbench worktrees |
+
+The three `team-*` skills are also exposed as slash commands in `.claude/commands/` — same content, user-invocable entry points. The next section describes the team lifecycle they implement.
+
+---
+
 ## Claude Code Team Commands
 
 These are slash commands in `.claude/commands/` that coordinate multi-agent team workflows. They are invoked as `/team-plan`, `/team-execute`, and `/team-shutdown`. Each command defines a phase of the team lifecycle.

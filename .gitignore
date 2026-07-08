@@ -65,6 +65,10 @@ ISSUE_RESEARCH.md
 .plans/
 .prototypes/
 
+# ── sync-gate local overrides (never tracked) ──
+# Identity-bearing leak patterns for scripts/sync-lib.sh; local-only.
+scripts/leak-patterns.local
+
 # ── Claude Code runtime (never tracked) ──
 .claude/debug/
 .claude/projects/

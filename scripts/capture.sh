@@ -18,22 +18,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
-# Hand-maintained files; capture leaves these untouched.
-CURATED=(
-  ".claude/CLAUDE.md"
-  ".claude/settings.json"
-  ".claude/remote-settings.json"
-  ".claude/statusline.sh"
-  ".claude/hooks/session-goal-init.sh"
-  ".claude/rules/learned-anti-patterns.md"
-  ".claude/skills/goal/SKILL.md"
-  ".claude/skills/goal/goal.sh"
-  ".cursor/mcp.json"
-  ".cursor/hooks.json"
-)
+if [[ ! -f "$SCRIPT_DIR/sync-lib.sh" ]]; then
+  echo "Error: $SCRIPT_DIR/sync-lib.sh not found (required shared library)." >&2
+  exit 1
+fi
+# shellcheck source=sync-lib.sh
+source "$SCRIPT_DIR/sync-lib.sh"
 
 CLAUDE_ONLY=false
 CURSOR_ONLY=false
+# Files actually refreshed in THIS run; the leak sweep below scans only these
+# (delta-scoped), not the whole tree.
+REFRESHED_FILES=()
 
 usage() {
   cat <<'EOF'
@@ -66,14 +62,6 @@ parse_flags() {
   fi
 }
 
-is_curated() {
-  local rel="$1" c
-  for c in "${CURATED[@]}"; do
-    [[ "$rel" == "$c" ]] && return 0
-  done
-  return 1
-}
-
 capture_tree() {
   local top="$1"                 # .claude | .cursor
   local live="$HOME/$top"
@@ -99,9 +87,27 @@ capture_tree() {
     /bin/mkdir -p "$(dirname "$dst")"
     /bin/cp -L "$src" "$dst"      # resolve symlinks to real file content
     refreshed=$((refreshed + 1))
+    REFRESHED_FILES+=("$rel")
   done < <(git -C "$REPO_DIR" ls-files -- "$top")
 
   echo "   refreshed $refreshed file(s); left $curated curated, $absent live-absent untouched"
+}
+
+# leak_sweep scans every file refreshed in this run (REFRESHED_FILES) against
+# sync-lib.sh's leak patterns. Returns 0 if clean, 1 if any file flagged.
+leak_sweep() {
+  local rel abs rc=0
+  # bash 3.2: expanding "${REFRESHED_FILES[@]}" on a zero-element array is an
+  # unbound-variable error under set -u, so skip the loop entirely when empty.
+  if [[ ${#REFRESHED_FILES[@]} -gt 0 ]]; then
+    for rel in "${REFRESHED_FILES[@]}"; do
+      abs="$REPO_DIR/$rel"
+      if ! leak_scan_file "$abs" "$rel"; then
+        rc=1
+      fi
+    done
+  fi
+  return $rc
 }
 
 main() {
@@ -120,6 +126,14 @@ main() {
   if ! $CURSOR_ONLY; then capture_tree ".claude"; fi
   if ! $CLAUDE_ONLY;  then capture_tree ".cursor"; fi
   echo ""
+
+  if ! leak_sweep; then
+    echo ""
+    echo "Leak sweep found possible identity-bearing content in the files above."
+    echo "Review and revert before committing (e.g. git diff, git checkout -- <file>)."
+    exit 1
+  fi
+
   echo "Review changes:"
   echo "  git -C \"$REPO_DIR\" diff --stat"
   echo "  git -C \"$REPO_DIR\" status"

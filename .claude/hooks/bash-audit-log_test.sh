@@ -2,7 +2,8 @@
 # Test bash-audit-log.sh redacts credentials before append.
 set -euo pipefail
 
-HOOK="$HOME/.claude/hooks/bash-audit-log.sh"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+HOOK="$SCRIPT_DIR/bash-audit-log.sh"
 TMP_HOME=$(mktemp -d)
 trap "rm -rf $TMP_HOME" EXIT
 
@@ -47,6 +48,24 @@ if grep -q 'GHTOKEN_xyz123' "$LOG"; then
 fi
 if ! grep -q '<redacted>@github.com' "$LOG"; then
     echo "FAIL: token-only URL redaction marker missing"
+    exit 1
+fi
+
+# Test 5: real session_id from hook input JSON is recorded in the log line
+INPUT='{"session_id":"test-sess-123","tool_input":{"command":"echo hi"},"cwd":"/tmp"}'
+echo "$INPUT" | HOME="$TMP_HOME" "$HOOK"
+if ! grep -q 'session:test-sess-123' "$LOG"; then
+    echo "FAIL: real session_id from hook input JSON not recorded"
+    cat "$LOG"
+    exit 1
+fi
+
+# Test 6: JSON without session_id falls back to session:unknown
+INPUT='{"tool_input":{"command":"echo hi again"},"cwd":"/tmp"}'
+echo "$INPUT" | HOME="$TMP_HOME" "$HOOK"
+if ! tail -1 "$LOG" | grep -q 'session:unknown'; then
+    echo "FAIL: missing session_id should fall back to session:unknown"
+    cat "$LOG"
     exit 1
 fi
 

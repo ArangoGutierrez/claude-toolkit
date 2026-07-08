@@ -10,7 +10,7 @@
 # Exit 0 = allow (not a test file, or test passes quality check)
 # Exit 2 = block (theater test detected)
 
-set -uo pipefail
+set -o pipefail
 
 INPUT=$(cat)
 FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // .tool_input.path // empty')
@@ -39,6 +39,13 @@ if [[ "$FILE_PATH" == *_test.go ]]; then
     fi
     if grep -nE '(assert\.True\(t,\s*true\)|assert\.False\(t,\s*false\))' "$FILE_PATH" 2>/dev/null; then
         ISSUES="${ISSUES}\n  - Tautological assertion: assert.True(t, true) or assert.False(t, false)"
+    fi
+
+    # Index-based access into list-returning APIs — assumes a stable order the
+    # API doesn't guarantee (K8s .Items[N], slice[0] from a Range/List call).
+    # Tests that pass on the writer's machine and break under reordering.
+    if grep -nE '\.Items\[[0-9]+\]' "$FILE_PATH" 2>/dev/null; then
+        ISSUES="${ISSUES}\n  - Index-based access into .Items[N]: list order is not guaranteed. Use a map keyed by Name/UID, or sort before comparison (testify ElementsMatch for sets)."
     fi
 
     # Test functions with no assertions (only t.Log, t.Logf, or empty)

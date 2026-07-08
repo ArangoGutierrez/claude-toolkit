@@ -1,6 +1,6 @@
 ---
 name: tdd-protocol
-description: Use when starting implementation work or when TDD guard hook fires
+description: Use when starting implementation work
 user-invocable: true
 ---
 
@@ -21,9 +21,9 @@ Plan → Red → Green → Mutate → Refactor. Never skip phases.
   - Write the simplest code that makes the test pass
   - No optimization, no cleanup — just pass
 - **Mutate**: After Green, before Refactor. Signal: `[MUTATE]`
-  - Run `~/.claude/hooks/mutation-gate.sh` on changed packages
-  - If >30% mutants survive, your tests are theater — go back to Red and strengthen them
-  - Requires `gremlins` (Go) or Stryker (TS/JS). Skip if tools unavailable.
+  - Mutation-check guards by hand: delete or weaken the guard under test (the condition, the regex, the boundary check) and confirm the suite goes red
+  - If a mutated/weakened guard still passes the suite, your tests are theater — go back to Red and strengthen them
+  - For non-guard logic, an automated mutation tool (`gremlins` for Go, Stryker for TS/JS) can supplement hand-checking when available; skip if tools unavailable
 - **Refactor**: Clean up only after green + mutate. Signal: `[REFACTOR]`
   - Checkpoint first if >3 files or >50 LOC changed
   - Improve structure, naming, duplication
@@ -35,8 +35,7 @@ Plan → Red → Green → Mutate → Refactor. Never skip phases.
 - **Batch size**: Smallest PR-sized chunks. 1 concern = 1 PR
 - Tests define "done". Implementation stops when tests pass
 
-## Enforcement (hybrid)
+## Enforcement
 
-- **Hook guard** (always on): `tdd-guard.sh` blocks implementation writes when no failing test exists. If the hook fires, you are in the wrong phase — write or modify a test first.
+- **Discipline-enforced, not hook-enforced**: no automated guard blocks implementation writes. Catching yourself writing implementation before a failing test exists means you're in the wrong phase — stop and go back to Red.
 - **Escalation**: When diff exceeds threshold, use isolated subagent contexts — one for Red (test writing), one for Green (implementation). Prevents same-author blind spots where the test writer unconsciously shapes tests to match the implementation they're already imagining.
-- **Escape hatch**: Set `SKIP_TDD_GUARD=1` for exceptional cases (hotfixes, generated code). Document why.

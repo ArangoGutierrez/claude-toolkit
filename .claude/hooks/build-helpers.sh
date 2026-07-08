@@ -35,4 +35,5 @@ build_one() {
     echo "built: $bin_path"
 }
 
-build_one test-dep-map-ast
+# No compiled Go helpers currently registered. Add `build_one <name>` calls
+# here as new hooks/src/<name>/ modules are introduced.

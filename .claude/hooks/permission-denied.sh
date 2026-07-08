@@ -3,7 +3,7 @@
 # Hook event: PermissionDenied (Claude Code 2.x)
 # Exit 0 always — informational only, never blocks.
 
-set -uo pipefail
+set -o pipefail
 
 INPUT=$(cat)
 TOOL=$(echo "$INPUT" | jq -r '.tool_name // .tool // "unknown"')

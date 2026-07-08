@@ -21,7 +21,8 @@ mkdir -p "$LOG_DIR" 2>/dev/null
 LOG_FILE="$LOG_DIR/bash-commands-$(date +%Y-%m-%d).log"
 
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-SESSION_ID="${CLAUDE_SESSION_ID:-unknown}"
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // empty')
+[ -z "$SESSION_ID" ] && SESSION_ID="unknown"
 CWD=$(echo "$INPUT" | jq -r '.cwd // empty')
 [ -z "$CWD" ] && CWD="$(pwd)"
 

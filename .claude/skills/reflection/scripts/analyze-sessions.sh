@@ -18,9 +18,13 @@ if ls "${AUDIT_DIR}"/bash-commands-*.log >/dev/null 2>&1; then
 
     echo ""
     echo "Top 10 commands:"
-    cat "${AUDIT_DIR}"/bash-commands-*.log 2>/dev/null | \
-        grep -v '^#' | grep -v '^$' | \
-        sed 's/\t.*//' | sort | uniq -c | sort -rn | head -10
+    # Entry lines start with "TIMESTAMP | session:… | cwd:… | cmd: …";
+    # multi-line commands continue on bare lines (heredoc bodies, loop
+    # bodies) which must NOT be counted as commands. Keep entry lines
+    # only, strip the prefix, count the leading command word.
+    grep -hE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]+Z \| ' "${AUDIT_DIR}"/bash-commands-*.log 2>/dev/null | \
+        sed -E 's/^[^|]*\| session:[^|]*\| cwd:[^|]*\| cmd: //' | \
+        awk 'NF {print $1}' | sort | uniq -c | sort -rn | head -10
 
     echo ""
     echo "Error patterns:"

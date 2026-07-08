@@ -57,6 +57,12 @@ mk_ok() { # .go Edit + a verify Bash (go test)
     printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"go test ./..."}}]}}'
   } > "$1"
 }
+mk_test_sh() { # .sh Edit + a Bash running the *_test.sh harness idiom (bash foo_test.sh)
+  {
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/.claude/hooks/foo.sh"}}]}}'
+    printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash","input":{"command":"bash .claude/hooks/foo_test.sh"}}]}}'
+  } > "$1"
+}
 mk_docs() { printf '%s\n' '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Edit","input":{"file_path":"/repo/README.md"}}]}}' > "$1"; }
 run_gate() { # $1=transcript $2=stop_hook_active(true/false); sets RC, ERROUT
   local tj; tj=$(jq -nc --arg t "$1" --argjson s "$2" '{transcript_path:$t, stop_hook_active:$s}')
@@ -73,6 +79,9 @@ is "main: code change + verify ran -> ALLOW" "$RC" 0
 
 mk_block "$WORK/guard.jsonl"; run_gate "$WORK/guard.jsonl" false
 is "main: non-verify Bash still BLOCKS" "$RC" 2
+
+mk_test_sh "$WORK/testsh.jsonl"; run_gate "$WORK/testsh.jsonl" false
+is "main: _test.sh harness invocation -> ALLOW" "$RC" 0
 
 mk_docs "$WORK/docs.jsonl"; run_gate "$WORK/docs.jsonl" false
 is "main: docs-only change -> ALLOW" "$RC" 0

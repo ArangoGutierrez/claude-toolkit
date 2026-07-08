@@ -9,7 +9,9 @@ DIFF="$SCRIPT_DIR/diff.sh"
 LIB="$SCRIPT_DIR/sync-lib.sh"
 
 fails=0
-tmproot="$(mktemp -d)"; trap 'rm -rf "$tmproot"' EXIT
+tmproot="$(mktemp -d)" || { echo "FAIL: mktemp -d failed" >&2; exit 1; }
+[[ -n "$tmproot" ]] || { echo "FAIL: mktemp -d returned an empty path" >&2; exit 1; }
+trap 'rm -rf "$tmproot"' EXIT
 pass(){ echo "ok: $1"; }
 fail(){ echo "FAIL: $1"; fails=$((fails+1)); }
 
@@ -162,5 +164,55 @@ out="$(HOME="$home" REPO_DIR="$repo" bash "$DIFF" --claude-only 2>&1)"
 echo "$out" | grep -qF '  LEAK?        .claude/hooks/adv.sh' \
   && pass "T10 diff.sh prints LEAK? advisory for a changed file" \
   || fail "T10 diff.sh missing LEAK? advisory: $out"
+
+
+# T11 (discriminates Fix 2): placeholder exemption is per-match, not per-line.
+# Scenario A: a file whose only "leak-shaped" content is a documented
+# placeholder path must not flag. Catches: the generic /Users/ pattern
+# flagging doc/fixture placeholder paths (e.g. "/Users/foo/repo") forever,
+# even though they are legitimate example content, not real leaks.
+repo="$tmproot/t11a-repo"; home="$tmproot/t11a-home"
+mkdir -p "$repo/.claude/hooks" "$home/.claude/hooks"
+git init -q "$repo"
+echo "placeholder line" > "$repo/.claude/hooks/exempt.sh"
+git -C "$repo" add -A
+echo "see /Users/foo/repo for an example" > "$home/.claude/hooks/exempt.sh"
+out="$(HOME="$home" REPO_DIR="$repo" bash "$CAPTURE" --claude-only 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && ! echo "$out" | grep -q 'LEAK?' \
+  && pass "T11 documented placeholder path (/Users/foo) does not flag" \
+  || fail "T11a expected rc=0 and no LEAK?, got rc=$rc: $out"
+
+# Scenario B: a line containing BOTH an exempt placeholder AND a real path
+# sharing the same line must still flag. Catches: exemption implemented as a
+# lazy per-line filter (e.g. grep -v on any exempt substring), which would
+# mask the real hit riding along on the same line as the placeholder.
+repo="$tmproot/t11b-repo"; home="$tmproot/t11b-home"
+mkdir -p "$repo/.claude/hooks" "$home/.claude/hooks"
+git init -q "$repo"
+echo "clean" > "$repo/.claude/hooks/mixed.sh"
+git -C "$repo" add -A
+echo "see /Users/foo/a and /Users/testuser/b" > "$home/.claude/hooks/mixed.sh"
+out="$(HOME="$home" REPO_DIR="$repo" bash "$CAPTURE" --claude-only 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && echo "$out" | grep -q 'LEAK?.*mixed\.sh' \
+  && pass "T11 mixed placeholder+real-path line still flags (per-match proof)" \
+  || fail "T11b expected rc!=0 and LEAK? naming mixed.sh, got rc=$rc: $out"
+
+# T12 (discriminates Fix 1): true delta-scoping. Catches: capture.sh copying
+# every live-present tracked file unconditionally regardless of whether it
+# actually changed, so REFRESHED_FILES (and the leak sweep) covers the whole
+# tree on every run instead of just this run's delta, and the "refreshed N"
+# summary reports N > 0 even when live == repo for every file.
+repo="$tmproot/t12-repo"; home="$tmproot/t12-home"
+mkdir -p "$repo/.claude/hooks" "$home/.claude/hooks"
+git init -q "$repo"
+echo "echo hello" > "$repo/.claude/hooks/a.sh"
+echo "see /Users/foo/repo for an example" > "$repo/.claude/hooks/b.sh"
+git -C "$repo" add -A
+echo "echo hello" > "$home/.claude/hooks/a.sh"
+echo "see /Users/foo/repo for an example" > "$home/.claude/hooks/b.sh"
+out="$(HOME="$home" REPO_DIR="$repo" bash "$CAPTURE" --claude-only 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && echo "$out" | grep -q 'refreshed 0 file' \
+  && pass "T12 fully-in-sync tree: capture rc=0, refreshed 0 (true delta-scope)" \
+  || fail "T12 expected rc=0 and 'refreshed 0', got rc=$rc: $out"
 
 echo "---"; if [ "$fails" -eq 0 ]; then echo "ALL PASS"; else echo "$fails FAILED"; exit 1; fi

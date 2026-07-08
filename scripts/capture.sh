@@ -71,7 +71,7 @@ capture_tree() {
   fi
 
   echo ">> Capturing $top/ (allowlist = tracked files)"
-  local refreshed=0 curated=0 absent=0
+  local refreshed=0 unchanged=0 curated=0 absent=0
 
   while IFS= read -r rel; do
     [[ -z "$rel" ]] && continue
@@ -84,13 +84,19 @@ capture_tree() {
       absent=$((absent + 1))     # live no longer has it; keep the repo copy
       continue
     fi
+    if [[ -e "$dst" ]] && cmp -s "$src" "$dst"; then
+      # Already in sync: not part of this run's delta, so it must not enter
+      # REFRESHED_FILES (that array is what the leak sweep below scans).
+      unchanged=$((unchanged + 1))
+      continue
+    fi
     /bin/mkdir -p "$(dirname "$dst")"
     /bin/cp -L "$src" "$dst"      # resolve symlinks to real file content
     refreshed=$((refreshed + 1))
     REFRESHED_FILES+=("$rel")
   done < <(git -C "$REPO_DIR" ls-files -- "$top")
 
-  echo "   refreshed $refreshed file(s); left $curated curated, $absent live-absent untouched"
+  echo "   refreshed $refreshed file(s) ($unchanged unchanged); left $curated curated, $absent live-absent untouched"
 }
 
 # leak_sweep scans every file refreshed in this run (REFRESHED_FILES) against

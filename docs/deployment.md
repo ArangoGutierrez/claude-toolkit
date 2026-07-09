@@ -100,6 +100,33 @@ capture.sh passes `--copy-links` to rsync. This is important because some files 
 (notably command scripts) may be symlinks. `--copy-links` dereferences them, so the repo stores
 the actual file content rather than a dangling symlink.
 
+### Leak sweep
+
+After copying, capture.sh scans every file it actually refreshed **this run** — not the
+whole tree — for identity-bearing content that must never land in this public repo:
+
+- **Generic patterns** (always active, defined in `scripts/sync-lib.sh`): `/Users/<name>`
+  and `/home/<name>` path prefixes.
+- **Local patterns** (optional, machine-specific): one ERE per line, loaded from
+  `LEAK_PATTERNS_FILE` (default `scripts/leak-patterns.local`, gitignored — never
+  committed). Use this for real names, machine usernames, or private project paths. Blank
+  lines and `#`-prefixed lines are skipped.
+- If `LEAK_PATTERNS_FILE` is absent, capture.sh prints a loud warning to stderr
+  (`WARNING: scripts/leak-patterns.local not found — leak sweep running with generic
+  patterns only`) and proceeds with generic patterns alone — it never fails silently.
+- **Placeholder exemption**: documented example paths that legitimately appear in tracked
+  docs and fixtures — `/Users/foo`, `/Users/me`, `/Users/you`, `/home/user` — are exempted
+  from the generic patterns so they don't flag forever. The exemption is per-match, not
+  per-line: a line combining an exempt placeholder with a real path (e.g. a stray
+  `/Users/testuser`) still flags.
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | Capture completed; leak sweep found nothing |
+| `1` | Leak sweep found possible identity-bearing content (see the `LEAK?` lines printed above the summary). The copies are still made — that's safe, since they're uncommitted working-tree changes — but review with `git diff` and revert an individual file with `git checkout -- <file>` before committing |
+
 ### Flags
 
 | Flag | Effect |
@@ -135,6 +162,7 @@ Each file that is not identical in both places is reported under one of three la
 | `REPO ONLY` | File exists in the repo but not in the live environment |
 | `CHANGED` | File exists in both places but the contents differ |
 | `LIVE ONLY` | File exists in the live environment but not in the repo |
+| `LEAK?` | Advisory only, printed under a `CHANGED` entry when the live copy matches a leak-sweep pattern (see [capture.sh's Leak sweep](#leak-sweep)) — does not change diff.sh's exit code |
 
 A per-directory summary line shows the count in each category. If everything matches, the
 section prints `(in sync)`.

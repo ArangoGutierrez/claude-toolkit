@@ -10,18 +10,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="${REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 
-# Hand-maintained files; diff skips these (kept in sync with capture.sh).
-CURATED=(
-  ".claude/CLAUDE.md"
-  ".claude/settings.json"
-  ".claude/remote-settings.json"
-  ".claude/statusline.sh"
-  ".claude/hooks/session-goal-init.sh"
-  ".claude/skills/goal/SKILL.md"
-  ".claude/skills/goal/goal.sh"
-  ".cursor/mcp.json"
-  ".cursor/hooks.json"
-)
+if [[ ! -f "$SCRIPT_DIR/sync-lib.sh" ]]; then
+  echo "Error: $SCRIPT_DIR/sync-lib.sh not found (required shared library)." >&2
+  exit 1
+fi
+# shellcheck source=sync-lib.sh
+source "$SCRIPT_DIR/sync-lib.sh"
 
 CLAUDE_ONLY=false
 CURSOR_ONLY=false
@@ -56,14 +50,6 @@ if $CLAUDE_ONLY && $CURSOR_ONLY; then
 fi
 
 DIFF_FOUND=false
-
-is_curated() {
-  local rel="$1" c
-  for c in "${CURATED[@]}"; do
-    [[ "$rel" == "$c" ]] && return 0
-  done
-  return 1
-}
 
 # Resolve a symlink to its target file for content comparison.
 resolve_file() {
@@ -107,6 +93,11 @@ compare_tree() {
       echo "  CHANGED       $rel"
       changed=$((changed + 1))
       DIFF_FOUND=true
+      # Advisory only: does not change diff.sh's exit semantics (still 1 on
+      # any difference, 0 in sync).
+      if ! leak_scan_file "$(resolve_file "$live_file")" "$rel"; then
+        echo "  LEAK?        $rel"
+      fi
     fi
   done < <(git -C "$REPO_DIR" ls-files -- "$top")
 

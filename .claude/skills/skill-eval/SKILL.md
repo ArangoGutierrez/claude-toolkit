@@ -1,5 +1,6 @@
 ---
 name: skill-eval
+disable-model-invocation: true
 user-invocable: true
 description: >
   Measure skill discoverability — run each skill's evals.json (positive +

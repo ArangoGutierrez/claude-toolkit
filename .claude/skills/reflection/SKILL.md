@@ -41,11 +41,29 @@ When user says "I keep making this mistake" or describes a recurring error:
 3. Update `audit/.last-reflection` with today's date when complete
 
 ### Pattern Promotion
-When anti-pattern hits Count >= 3 AND is mechanically detectable (regex, AST grep, or exit-code without model reasoning):
-- Propose new regex in `hooks/test-quality-lint.sh` (test patterns)
-- Or new check in existing hook (code patterns)
-- Or new rule in `rules/` (convention patterns)
-- Mark entry: append `| **Promoted**: <hook-name>`
+Run `scripts/promotion-candidates.sh` to list entries with Count >= 3 not yet
+marked `| **Promoted**:`. For each candidate:
+
+**Mechanical branch** — pattern is expressible as regex / AST grep / exit-code
+(no model reasoning needed):
+- Propose a regex in `hooks/test-quality-lint.sh` (test patterns), or
+- A check in an existing hook (code patterns), or
+- A new line in `rules/` (convention patterns).
+
+**Behavioral branch** — pattern needs judgment (not mechanically detectable).
+Propose promotion using this taxonomy:
+- Repeatable, user-invoked sequence → **command** (`commands/<name>.md`)
+- Auto-triggered behavior / style enforcement → **skill** (`skills/<name>/SKILL.md`)
+- Complex, multi-step process needing isolation → **agent** (`agents/<name>.md`)
+
+Propose only. After user approval, create the artifact and append
+`| **Promoted**: <artifact>` to the anti-pattern entry.
+
+### Scoping
+- Project-specific pattern → repo `.claude/rules/learned-anti-patterns.md`.
+- Universal pattern → global `~/.claude/rules/learned-anti-patterns.md`.
+- On duplicate pattern text, project overrides global (dedup is by pattern text,
+  not ID). Global edits reach `~/.claude` via `scripts/sync-to-home.sh`.
 
 ## Write Safety
 Before writing to `rules/learned-anti-patterns.md`:

@@ -15,7 +15,7 @@
 # Exit 0 = allow
 # Exit 2 = block (stderr becomes Claude's feedback)
 
-set -uo pipefail
+set -o pipefail
 
 CURRENT_YEAR=$(date +%Y)
 INPUT=$(cat)

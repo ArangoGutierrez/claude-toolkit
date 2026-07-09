@@ -22,3 +22,6 @@ Failure modes observed more than once. Violating any of these is a blocking issu
 - Writing 500 LOC of tests that all pass immediately — this means you wrote tests AFTER implementation, not before.
 - Creating test helpers/utilities before writing any actual test — premature abstraction.
 - Excessive mocking that decouples tests from real behavior entirely.
+
+## Failure → Eval
+A failure observed twice ships its fix WITH an executable check (eval or harness case) that fails when the fix regresses. A memory note is not a fix. Evals live in `.claude/evals/`; `/skill-eval` covers discoverability; `scripts/run-evals.sh` runs weekly.

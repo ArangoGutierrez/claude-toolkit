@@ -3,7 +3,7 @@
 # Blocks (exit 2) when checkpoint stale AND any worktree has uncommitted source.
 # Otherwise emits preservation instructions and exits 0.
 
-set -uo pipefail
+set -o pipefail
 
 # Always emit the preservation instructions to stdout
 cat <<'EOF'

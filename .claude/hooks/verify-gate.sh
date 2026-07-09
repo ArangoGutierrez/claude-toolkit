@@ -3,7 +3,7 @@
 # test/build/lint command ran. Fail-open (exit 0) on any error; block = exit 2.
 set -uo pipefail
 
-DEFAULT_VERIFY_PATTERN='go test|go build|go vet|gotestsum|pytest|py\.test|tox|nox|npm test|npm run test|yarn test|pnpm test|jest|vitest|cargo test|cargo build|cargo check|cargo clippy|make test|make check|make lint|make verify|make ci|golangci-lint|staticcheck|ruff|mypy|pyright|eslint|tsc|shellcheck|bats|ctest|bazel test|gradle test|mvn test|mvn verify|rspec'
+DEFAULT_VERIFY_PATTERN='go test|go build|go vet|gotestsum|pytest|py\.test|tox|nox|npm test|npm run test|yarn test|pnpm test|jest|vitest|cargo test|cargo build|cargo check|cargo clippy|make test|make check|make lint|make verify|make ci|golangci-lint|staticcheck|ruff|mypy|pyright|eslint|tsc|shellcheck|bats|ctest|bazel test|gradle test|mvn test|mvn verify|rspec|[a-z0-9_-]+_test\.sh'
 DEFAULT_CODE_EXT='go py ts tsx js jsx mjs cjs rs sh bash c h cc cpp hpp java rb php swift kt scala sql proto'
 
 # extract_rows <transcript_file>: print "name<TAB>arg" per tool_use entry

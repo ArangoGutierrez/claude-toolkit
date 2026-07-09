@@ -34,6 +34,8 @@ You are the **Team Lead**. You coordinate work from the `agents-workbench` branc
 
 **Reference:** Read `references/planning-methodology.md` for decomposition rules, estimation, risk scoring, wave planning, and output format.
 
+**Pre-flight — is this a team job?** Confirm BOTH hold before planning a team: the tasks are genuinely independent (no shared files, no cross-task dependencies) AND the work's value justifies multi-agent's ~15× token cost. If either fails, say which criterion failed and use the solo path (`superpowers:subagent-driven-development`) instead — a one-Worker "team" is usually a solo job. This gate is binding; the steps below assume the team path.
+
 **Steps:**
 
 1. **Verify branch:** `git branch --show-current` must show `agents-workbench`.
@@ -44,8 +46,9 @@ You are the **Team Lead**. You coordinate work from the `agents-workbench` branc
    - Behind >50: **hard gate** — refuse to plan until synced
 
 3. **Brainstorm approach:** What are we building? What are the independent tasks? Present >=3 options.
+   - **Panel hook-point (A/B):** When a planning fork is a genuine design decision (architecture, security posture, API shape, irreversible/outward-facing) — never trivial/reversible choices — the Lead surfaces it as an `AskUserQuestion` with exactly one `(Recommended)` option and the reasoning in the option descriptions. If you run a recommendation-review panel, handle its verdict: HOLD → proceed with the recommended option; DISSENT → queue the augmented question for the user; ERROR → re-ask original.
 
-4. **Decompose work:** Use Task 0 pattern (shared infrastructure first). Score complexity (1-4). Validate independence. One concern per task.
+4. **Decompose work:** Use Task 0 pattern (shared infrastructure first). Score complexity (1-4). Validate independence. One concern per task. For each task's internal breakdown, use `superpowers:writing-plans` to produce the bite-sized TDD steps (failing test → minimal impl → verify → commit) — do not hand-roll a different task format.
 
 5. **Assess risks:** Score each risk (likelihood x impact). Mitigate or stop-and-reassess for blockers.
 
@@ -56,7 +59,7 @@ You are the **Team Lead**. You coordinate work from the `agents-workbench` branc
 
 7. **Plan waves** (if >3 tasks): Max 3 per wave. Dependencies in earlier waves. Risk-first. Use wave transition checklist.
 
-8. **Write plan:** Output to `.agents/plans/<project-name>.md` with all 7 required sections (see methodology reference).
+8. **Write plan:** Invoke `superpowers:writing-plans` for the bite-sized task breakdown, then layer the team-specific sections around it (Task List with Worker+Wave columns, Risk Register, Wave Plan, Branch Strategy, Dependencies Map, Success Criteria — see methodology reference). Save the combined plan to `.agents/plans/<project-name>.md`. (Do not edit the `writing-plans` plugin; the Team path is the executor per CLAUDE.md's Execution Model.)
 
 9. **Update AGENTS.md:** Record task assignments, branch strategy, wave plan.
 

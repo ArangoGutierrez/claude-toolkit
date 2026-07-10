@@ -30,7 +30,7 @@ def test_load_default_config_only_da_enabled(tmp_path):
             role: DA
             enabled: true
             backend: nat-nim
-            model: nvidia/nemotron-3-super-v3
+            model: example-org/example-model
           - id: pe
             role: PE
             enabled: false
@@ -47,7 +47,7 @@ def test_load_default_config_only_da_enabled(tmp_path):
     assert len(enabled) == 1
     assert enabled[0].id == "da-nemotron"
     assert enabled[0].backend == "nat-nim"
-    assert enabled[0].model == "nvidia/nemotron-3-super-v3"
+    assert enabled[0].model == "example-org/example-model"
 
 
 def test_reject_even_enabled_count(tmp_path):

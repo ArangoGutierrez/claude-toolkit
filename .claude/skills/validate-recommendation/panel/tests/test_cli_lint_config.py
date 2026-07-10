@@ -25,7 +25,7 @@ def test_lint_config_ok_for_valid_single_panelist(tmp_path, capsys):
             role: DA
             enabled: true
             backend: nat-nim
-            model: nvidia/nemotron-3-super-v3
+            model: example-org/example-model
     """)
     rc = main(["lint-config", "--config", str(cfg)])
     out = capsys.readouterr().out

@@ -1,4 +1,4 @@
-"""Reusable agentic engine shared by kickoff, validate-recommendation, magi."""
+"""Reusable agentic engine shared by kickoff, validate-recommendation, and other skills."""
 
 from tool.errors import (
     EngineError, BackendError, ToolError, LoopBudgetError, SchemaError,

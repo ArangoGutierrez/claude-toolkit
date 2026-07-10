@@ -30,7 +30,7 @@ def _invoke_nat(panelist: Panelist, system: str, user: str) -> object:
     """The single mockable seam — tests mock this function entirely.
 
     Thin adapter over tool.backends.invoke_llm; the provider dispatch logic
-    lives in the shared engine so it can be shared with the magi skill.
+    lives in the shared engine so any council-style skill can reuse it.
     """
     return invoke_llm(
         backend=panelist.backend, model=panelist.model, system=system, user=user,

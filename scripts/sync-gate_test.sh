@@ -215,4 +215,30 @@ out="$(HOME="$home" REPO_DIR="$repo" bash "$CAPTURE" --claude-only 2>&1)"; rc=$?
   && pass "T12 fully-in-sync tree: capture rc=0, refreshed 0 (true delta-scope)" \
   || fail "T12 expected rc=0 and 'refreshed 0', got rc=$rc: $out"
 
+# T13 (discriminates the hub-ID gate): double-namespace ("hub-form") model IDs
+# must flag; single-namespace public catalog IDs must pass. Catches: an
+# extracted engine file carrying an internal hub-form default sailing through
+# capture into this public repo (the eval.py DEFAULT_MODEL class).
+repo="$tmproot/t13a-repo"; home="$tmproot/t13a-home"
+mkdir -p "$repo/.claude/tool" "$home/.claude/tool"
+git init -q "$repo"
+echo "MODEL = 'placeholder'" > "$repo/.claude/tool/cfg.py"
+git -C "$repo" add -A
+echo "MODEL = 'nvidia/nvidia/nemotron-x'" > "$home/.claude/tool/cfg.py"
+out="$(HOME="$home" REPO_DIR="$repo" bash "$CAPTURE" --claude-only 2>&1)"; rc=$?
+[ "$rc" -ne 0 ] && echo "$out" | grep -q 'LEAK?.*\.claude/tool/cfg\.py' \
+  && pass "T13 hub-form (double-namespace) model ID flips the gate" \
+  || fail "T13a expected rc!=0 + LEAK? naming cfg.py, got rc=$rc: $out"
+
+repo="$tmproot/t13b-repo"; home="$tmproot/t13b-home"
+mkdir -p "$repo/.claude/tool" "$home/.claude/tool"
+git init -q "$repo"
+echo "MODEL = 'placeholder'" > "$repo/.claude/tool/cfg.py"
+git -C "$repo" add -A
+echo "MODEL = 'nvidia/nemotron-3-ultra-550b-a55b:free'" > "$home/.claude/tool/cfg.py"
+out="$(HOME="$home" REPO_DIR="$repo" bash "$CAPTURE" --claude-only 2>&1)"; rc=$?
+[ "$rc" -eq 0 ] && ! echo "$out" | grep -q 'LEAK?' \
+  && pass "T13 public catalog (single-namespace) ID passes clean" \
+  || fail "T13b expected rc=0 and no LEAK?, got rc=$rc: $out"
+
 echo "---"; if [ "$fails" -eq 0 ]; then echo "ALL PASS"; else echo "$fails FAILED"; exit 1; fi

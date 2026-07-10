@@ -10,6 +10,8 @@ This page runs that evaluator against a `:free` OpenRouter model.
 
 ## Setup
 
+Engine dependencies installed? See [OpenRouter free tier](../patterns/openrouter-free-tier.md) — one pip install.
+
 Route the done evaluator through the `nat-openai` backend and point the
 OpenAI-compatible env vars at OpenRouter (see
 [OpenRouter Free-Tier Backend](../patterns/openrouter-free-tier.md)):

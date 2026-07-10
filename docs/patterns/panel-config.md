@@ -10,6 +10,10 @@ augmented with panelist reasoning), or **ERROR** (re-ask the original
 question — a panelist failed to respond usefully). The panel's behavior is
 entirely driven by one file, `config.yml`.
 
+At the wire level each panelist emits HOLD or OVERTURN (see the worked
+example); the aggregator maps OVERTURN votes into SOFT-DISSENT or
+HARD-DISSENT by the severity threshold.
+
 ## How
 
 Copy the template into place and adjust it:
@@ -23,7 +27,7 @@ Each entry under `panelists:` is independent:
 | Field | Meaning |
 |---|---|
 | `id` | short identifier used in trace/telemetry output |
-| `role` | `DA` (default advocate), `PE` (principal engineer), `QA`, or a custom role |
+| `role` | `DA` (devil's advocate), `PE` (principal engineer), `QA`, or a custom role |
 | `enabled` | panelists can be toggled off without deleting their config |
 | `backend` | `nat-openai`, `nat-anthropic`, `nat-nim`, or `claude-subagent` |
 | `model` | catalog ID (only for the three `nat-*` backends) |

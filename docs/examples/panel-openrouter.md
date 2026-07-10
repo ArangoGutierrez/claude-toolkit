@@ -10,6 +10,8 @@ a `:free` OpenRouter model.
 
 ## Setup
 
+Engine dependencies installed? See [OpenRouter free tier](../patterns/openrouter-free-tier.md) — one pip install.
+
 Copy the panel config template into place (see
 [Panel Config](../patterns/panel-config.md)):
 

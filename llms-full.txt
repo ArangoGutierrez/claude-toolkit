@@ -3073,6 +3073,14 @@ runs, or trying the toolkit before committing to a paid provider.
 
 ## How
 
+Install the engine's Python dependencies first (Python 3.12+):
+
+    pip install langchain-openai pyyaml requests
+
+(`langchain-openai` pulls the OpenAI-compatible client; the panel's config
+loader needs `pyyaml`; the engine's HTTP timeout shim needs `requests`.
+Backends other than nat-openai need their own langchain provider package.)
+
 `nat-openai` is one of three backends `tool.backends` knows how to build a
 chat client for (the others are `nat-nim` and `nat-anthropic`). It targets
 any OpenAI-compatible `/chat/completions` endpoint, OpenRouter included.
@@ -3198,6 +3206,10 @@ augmented with panelist reasoning), or **ERROR** (re-ask the original
 question — a panelist failed to respond usefully). The panel's behavior is
 entirely driven by one file, `config.yml`.
 
+At the wire level each panelist emits HOLD or OVERTURN (see the worked
+example); the aggregator maps OVERTURN votes into SOFT-DISSENT or
+HARD-DISSENT by the severity threshold.
+
 ## How
 
 Copy the template into place and adjust it:
@@ -3211,7 +3223,7 @@ Each entry under `panelists:` is independent:
 | Field | Meaning |
 |---|---|
 | `id` | short identifier used in trace/telemetry output |
-| `role` | `DA` (default advocate), `PE` (principal engineer), `QA`, or a custom role |
+| `role` | `DA` (devil's advocate), `PE` (principal engineer), `QA`, or a custom role |
 | `enabled` | panelists can be toggled off without deleting their config |
 | `backend` | `nat-openai`, `nat-anthropic`, `nat-nim`, or `claude-subagent` |
 | `model` | catalog ID (only for the three `nat-*` backends) |
@@ -3268,6 +3280,8 @@ runs that engine end to end against a `:free` OpenRouter model — no paid key,
 no mock.
 
 ## Setup
+
+Engine dependencies installed? See [OpenRouter free tier](../patterns/openrouter-free-tier.md) — one pip install.
 
 Point the generic OpenAI-compatible env vars at OpenRouter and route the
 kickoff engine through the `nat-openai` backend (see
@@ -3329,8 +3343,8 @@ suggesting unsafe verification commands.
 
 ## Privacy
 
-This example sends your prompt through OpenRouter's free tier. OpenRouter free
-routes may log prompts for provider training; use a paid route or a
+This example sends your prompt through OpenRouter's free tier. OpenRouter
+free routes may log prompts for provider training; use a paid route or a
 self-hosted endpoint for anything sensitive.
 
 ===== docs/examples/panel-openrouter.md =====
@@ -3346,6 +3360,8 @@ and captures its verdict, running the panelist's `nat-openai` backend against
 a `:free` OpenRouter model.
 
 ## Setup
+
+Engine dependencies installed? See [OpenRouter free tier](../patterns/openrouter-free-tier.md) — one pip install.
 
 Copy the panel config template into place (see
 [Panel Config](../patterns/panel-config.md)):
@@ -3431,6 +3447,8 @@ and returns a JSON verdict: `AGREE`, `DISAGREE`, or `INSUFFICIENT_EVIDENCE`.
 This page runs that evaluator against a `:free` OpenRouter model.
 
 ## Setup
+
+Engine dependencies installed? See [OpenRouter free tier](../patterns/openrouter-free-tier.md) — one pip install.
 
 Route the done evaluator through the `nat-openai` backend and point the
 OpenAI-compatible env vars at OpenRouter (see

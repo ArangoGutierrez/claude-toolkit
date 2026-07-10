@@ -11,6 +11,14 @@ runs, or trying the toolkit before committing to a paid provider.
 
 ## How
 
+Install the engine's Python dependencies first (Python 3.12+):
+
+    pip install langchain-openai pyyaml requests
+
+(`langchain-openai` pulls the OpenAI-compatible client; the panel's config
+loader needs `pyyaml`; the engine's HTTP timeout shim needs `requests`.
+Backends other than nat-openai need their own langchain provider package.)
+
 `nat-openai` is one of three backends `tool.backends` knows how to build a
 chat client for (the others are `nat-nim` and `nat-anthropic`). It targets
 any OpenAI-compatible `/chat/completions` endpoint, OpenRouter included.

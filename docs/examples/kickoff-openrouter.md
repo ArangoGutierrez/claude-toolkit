@@ -11,6 +11,8 @@ no mock.
 
 ## Setup
 
+Engine dependencies installed? See [OpenRouter free tier](../patterns/openrouter-free-tier.md) — one pip install.
+
 Point the generic OpenAI-compatible env vars at OpenRouter and route the
 kickoff engine through the `nat-openai` backend (see
 [OpenRouter Free-Tier Backend](../patterns/openrouter-free-tier.md)):

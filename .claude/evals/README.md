@@ -17,7 +17,10 @@ weekly job (below) and regressions announce themselves.
 
 Copy [`TEMPLATE.eval.sh`](TEMPLATE.eval.sh) to `<your-check>.eval.sh` and fill
 in the subject and the assertion. The template is a runnable, commented
-skeleton for the whole contract.
+skeleton for the whole contract. Note: as shipped, `TEMPLATE.eval.sh` itself is
+discovered by the runner and prints one `SKIP` line (its placeholder subject
+does not exist) — your weekly run stays green; the line disappears once you
+copy or customize it.
 
 Each eval is a self-contained script that:
 

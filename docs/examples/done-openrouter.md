@@ -32,11 +32,11 @@ printf '%s' '{"goal_stanza":"Goal: demo\nAcceptance:\n- tests pass","evidence":[
   | PYTHONPATH="$PWD/.claude" python3.12 .claude/skills/done/eval.py
 ```
 
-On any internal failure (model unreachable, unparseable response) the
+On any internal failure (model unreachable, unparsable response) the
 evaluator returns `{"verdict": "ERROR", ...}` and the `/done` skill falls back
 to the user's own claim — the evaluation never blocks closing a session.
 
-## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter)
 
 ```json
 {"verdict": "AGREE", "rationale": "The acceptance criterion \"tests pass\" is directly supported by the evidence record showing \"pytest: 12 passed\", which indicates that the test suite executed successfully with all tests passing. This satisfies the requirement that tests pass, as the evidence demonstrates a successful test run with zero failures. No contradictory information is present.", "gaps": []}

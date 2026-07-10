@@ -38,7 +38,7 @@ PYTHONPATH="$PWD/.claude" \
 `KICKOFF_PASSTHROUGH:` marker and exits 0, so a missing key never blocks your
 session. A successful run starts with a `## Kickoff` block.
 
-## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter)
 
 ```text
 ## Kickoff

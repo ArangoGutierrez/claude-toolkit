@@ -65,7 +65,7 @@ cat /tmp/da.verdict
 The DA persona emits a strict `VERDICT: HOLD | OVERTURN` line with a rationale
 and, on `OVERTURN`, the verbatim option label it prefers instead.
 
-## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter)
 
 ```text
 VERDICT: OVERTURN

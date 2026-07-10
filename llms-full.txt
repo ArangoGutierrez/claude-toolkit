@@ -3308,7 +3308,7 @@ PYTHONPATH="$PWD/.claude" \
 `KICKOFF_PASSTHROUGH:` marker and exits 0, so a missing key never blocks your
 session. A successful run starts with a `## Kickoff` block.
 
-## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter)
 
 ```text
 ## Kickoff
@@ -3416,7 +3416,7 @@ cat /tmp/da.verdict
 The DA persona emits a strict `VERDICT: HOLD | OVERTURN` line with a rationale
 and, on `OVERTURN`, the verbatim option label it prefers instead.
 
-## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter)
 
 ```text
 VERDICT: OVERTURN
@@ -3470,11 +3470,11 @@ printf '%s' '{"goal_stanza":"Goal: demo\nAcceptance:\n- tests pass","evidence":[
   | PYTHONPATH="$PWD/.claude" python3.12 .claude/skills/done/eval.py
 ```
 
-On any internal failure (model unreachable, unparseable response) the
+On any internal failure (model unreachable, unparsable response) the
 evaluator returns `{"verdict": "ERROR", ...}` and the `/done` skill falls back
 to the user's own claim — the evaluation never blocks closing a session.
 
-## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter)
 
 ```json
 {"verdict": "AGREE", "rationale": "The acceptance criterion \"tests pass\" is directly supported by the evidence record showing \"pytest: 12 passed\", which indicates that the test suite executed successfully with all tests passing. This satisfies the requirement that tests pass, as the evidence demonstrates a successful test run with zero failures. No contradictory information is present.", "gaps": []}

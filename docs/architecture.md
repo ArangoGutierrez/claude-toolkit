@@ -2,7 +2,7 @@
 
 This document explains the agents-workbench architecture from first principles. It is written for the broader developer community, including people new to Git worktrees and hook-based enforcement.
 
-Cross-references: [Claude Code Configuration](claude-code.md) | [Cursor Configuration](cursor.md) | [Getting Started](getting-started.md)
+Cross-references: [Engineering Discipline](engineering-discipline.md) | [Claude Code Configuration](claude-code.md) | [Cursor Configuration](cursor.md) | [Getting Started](getting-started.md)
 
 ---
 
@@ -33,7 +33,7 @@ This configuration solves these problems with a three-layer architecture:
 
 1. **Isolation via worktrees.** Every feature is developed in its own Git worktree — a separate directory that shares the same `.git` database but has an independent working tree. Agents are confined to their worktree. Concurrent work is physically separated.
 
-2. **Discipline via hooks.** Six Claude Code hooks and five Cursor hooks fire automatically on every relevant action. They enforce signed commits, TDD discipline, branch isolation, year correctness, and protection against dangerous commands. Hooks are not suggestions — they mechanically block non-compliant actions.
+2. **Discipline via hooks.** A suite of Claude Code and Cursor hooks fire automatically on every relevant action. The core enforcement hooks covered in this document handle signed commits, TDD discipline, branch isolation, year correctness, and protection against dangerous commands; the toolkit ships more hooks for verification, audit logging, and budget governance (see [Engineering Discipline](engineering-discipline.md)). Hooks are not suggestions — they mechanically block non-compliant actions.
 
 3. **Coordination via a read-only workbench branch.** A local-only branch called `agents-workbench` serves as the planning and coordination hub. Source code is read-only on this branch. Agents plan here and implement in worktrees. The workbench is never pushed to any remote.
 
@@ -294,7 +294,7 @@ The `.worktrees/` directory is gitignored, so there is nothing to clean up in ve
 
 ## 5. Hook Enforcement Matrix
 
-This table covers all eleven hooks across both Claude Code and Cursor, showing exactly what each one enforces and what it blocks.
+This table covers the core enforcement hooks — the ones that implement the coordination-branch and TDD model described above (six Claude Code hooks and five Cursor hooks). The toolkit ships additional Claude Code hooks for verification, audit logging, and budget governance; see [Engineering Discipline](engineering-discipline.md) and [Claude Code Configuration](claude-code.md#hooks) for the complete catalog.
 
 | Hook | Tool | Trigger | What It Enforces | What It Blocks |
 |------|------|---------|-----------------|----------------|
@@ -376,7 +376,7 @@ Worktrees are developer-local working directories, not project artifacts. Their 
 
 ## 7. Team Library Reference
 
-The `.claude/team/` directory contains reference material used by the Distinguished Systems Engineer agent during multi-agent team workflows (`/team-plan`, `/team-execute`, `/team-shutdown`).
+The `.claude/team/` directory contains reference material used by the Principal Engineer agent during multi-agent team workflows (`/team-plan`, `/team-execute`, `/team-shutdown`).
 
 The `team/lib/` subdirectory holds 11 files organized by concern:
 
@@ -387,4 +387,4 @@ The `team/lib/` subdirectory holds 11 files organized by concern:
 - **Observability:** `architect-observability.md` (metrics/logs/traces, SLI/SLO, alerting patterns, OpenTelemetry)
 - **Quality:** `qa-validator.md` (validation checklist for git signatures, language checks, CI replication, PR metadata)
 
-The Distinguished Engineer reads these libraries at team startup and consults them when Workers escalate design decisions. The QA Agent reads `qa-validator.md` to run its validation checklist. This material is what gives the team agents domain-specific knowledge beyond their base capabilities.
+The Principal Engineer reads these libraries at team startup and consults them when Workers escalate design decisions. The QA Engineer reads `qa-validator.md` to run its validation checklist. This material is what gives the team agents domain-specific knowledge beyond their base capabilities.

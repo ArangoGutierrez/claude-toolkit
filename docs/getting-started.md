@@ -1,8 +1,8 @@
 # Getting Started
 
-Welcome to the AI Engineering Dotfiles repo. This guide walks you through installing the configuration, verifying it works, and running your first workflow. If you are new to Claude Code or Cursor, that is fine — this guide explains what everything does as you go.
+Welcome to the claude-toolkit repo. This guide walks you through installing the configuration, verifying it works, and running your first workflow. If you are new to Claude Code or Cursor, that is fine — this guide explains what everything does as you go.
 
-For a deeper look at why things are structured this way, see [Architecture](architecture.md).
+For a deeper look at why things are structured this way, see [Architecture](architecture.md); for the principles the toolkit enforces, see [Engineering Discipline](engineering-discipline.md).
 
 ---
 
@@ -172,18 +172,20 @@ Open Claude Code and run `/status` (or check the settings panel) to confirm plug
 
 This repo enforces a worktree-based development model. You never commit implementation work directly to `main` or `master`. Instead:
 
-1. A local `agents-workbench` branch serves as your coordination hub (never pushed to remote).
+1. A local coordination branch serves as your planning hub (never pushed to remote).
 2. All feature work happens in `.worktrees/<name>/`, each on its own branch.
 
 Here is a minimal walkthrough.
 
-### Step 1: Set up the agents-workbench branch
+### Step 1: Set up the coordination branch
+
+From inside the project you want to work in, run the shipped setup script:
 
 ```bash
-git checkout -b agents-workbench
+~/.claude/scripts/setup-workbench.sh
 ```
 
-This branch is where you plan work, write `AGENTS.md`, and keep `.agents/plans/` documents. It is never pushed.
+This creates the local-only coordination branch and seeds an `AGENTS.md`. The branch is where you plan work, write `AGENTS.md`, and keep `.agents/plans/` documents; the `prevent-push-workbench.sh` hook keeps it from ever being pushed, and `enforce-worktree.sh` keeps source code read-only on it. See [Architecture](architecture.md) for the exact branch name and the enforcement details.
 
 ### Step 2: Create a worktree for your feature
 
@@ -334,7 +336,8 @@ Then copy the files you need back into place.
 
 ## Next Steps
 
-- [Architecture](architecture.md) — Deep-dive into the agents-workbench model, hook internals, and design decisions
+- [Engineering Discipline](engineering-discipline.md) — The six ideas the toolkit enforces, each linked to its shipped hook, rule, or skill
+- [Architecture](architecture.md) — Deep-dive into the coordination-branch model, hook internals, and design decisions
 - [Claude Code Configuration](claude-code.md) — Full reference for hooks, settings, plugins, and policies
 - [Cursor Configuration](cursor.md) — Agents, commands, rules, and hooks for Cursor IDE
 - [Deployment Scripts](deployment.md) — How `deploy.sh`, `capture.sh`, and `diff.sh` work

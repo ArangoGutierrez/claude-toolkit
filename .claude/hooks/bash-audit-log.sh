@@ -16,6 +16,19 @@ COMMAND=$(echo "$COMMAND" | /usr/bin/sed -E \
   -e 's,(--?(token|password|api[-_]?key|secret)[= ])[^[:space:]]+,\1<redacted>,gi')
 [ -z "$COMMAND" ] && exit 0
 
+# Fold embedded newlines to a literal \n so a compound/multi-line Bash call is
+# ONE physical log line that carries the session marker in full. Without this,
+# only the first physical line bears the "| session:<uuid> |" marker and
+# sub-commands 2..N are invisible to any downstream consumer that filters the
+# log line-by-line (e.g. grep -F "session:<uuid> "). Heredoc bodies fold in as
+# inert `\n`-joined data on the same line — they gain no marker of their own.
+# Pure-bash, no subprocess.
+NL=$'\n'
+ESC='\n'   # literal backslash-n
+# Only LF is folded; a lone CR (CRLF/old-Mac line) persists as a raw mid-line
+# byte — cosmetic, the entry stays one physical line and the marker holds.
+COMMAND=${COMMAND//$NL/$ESC}
+
 LOG_DIR="$HOME/.claude/audit"
 mkdir -p "$LOG_DIR" 2>/dev/null
 LOG_FILE="$LOG_DIR/bash-commands-$(date +%Y-%m-%d).log"

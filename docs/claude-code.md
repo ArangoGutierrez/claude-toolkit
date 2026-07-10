@@ -7,8 +7,8 @@
 What this configuration adds:
 
 - **Engineering standards** codified in `CLAUDE.md` — a mandatory brainstorm-first policy, a full TDD protocol (Plan→Red→Green→Refactor), an iteration budget, and a clear priority stack (Security > Correctness > Performance > Style).
-- **Enforcement hooks** that make the standards machine-checkable — six shell scripts that intercept file writes and Bash commands before Claude executes them, blocking violations with actionable error messages.
-- **A plugin ecosystem** — four official plugins covering code review, code simplification, Go language server integration, and the `superpowers` workflow engine that drives brainstorming, TDD, worktree management, and parallel agent dispatch.
+- **Enforcement hooks** that make the standards machine-checkable — core shell scripts that intercept file writes and Bash commands before Claude executes them, blocking violations with actionable error messages. The toolkit ships more hooks for verification, audit logging, and budget governance; see [Engineering Discipline](engineering-discipline.md) for the full catalog.
+- **A plugin ecosystem** — five official plugins covering code review, code simplification, Go and C/C++ language server integration, and the `superpowers` workflow engine that drives brainstorming, TDD, worktree management, and parallel agent dispatch.
 - **A fine-grained permissions model** — explicit allow/deny/ask lists for every tool Claude can call, plus a sandbox with network restrictions for remote use.
 
 ### File layout
@@ -31,6 +31,8 @@ What this configuration adds:
 └── remote-settings.json    # Network restrictions for sandboxed/remote use
 ```
 
+The `hooks/` subtree above lists the **core** enforcement hooks documented on this page. The toolkit ships more hooks — for verification, audit logging, and budget governance — under `.claude/hooks/`; see [Engineering Discipline](engineering-discipline.md) for the full catalog.
+
 ---
 
 ## CLAUDE.md — Engineering Standards
@@ -40,7 +42,7 @@ What this configuration adds:
 ### Role
 
 ```
-Senior Principal Engineer. Rigor > speed.
+Senior engineer mindset. Rigor > speed.
 ```
 
 The persona sets the tone: correctness and deliberate design take precedence over moving fast. Every decision should be defensible.
@@ -63,7 +65,7 @@ Exempt tasks (tasks where brainstorming is skipped entirely): fixing typos, addi
 |-----------|---------|
 | **Atomicity** | If a task has more than one concern, break it down before starting |
 | **No placeholders** | Complete, runnable code only — no `// TODO: implement` stubs |
-| **Verify** | Use the `/cove-verify` skill (Chain-of-Verification protocol) after implementation |
+| **Verify before claiming** | Any response claiming a task is complete must include the output of a verification command (test, build, or lint) in that same response |
 | **YAGNI** | Do not add abstractions the current task does not require |
 | **≥3 options** | Produce at least three design alternatives before committing to one |
 
@@ -194,16 +196,19 @@ Hooks are shell scripts that intercept Claude's tool calls before they execute. 
 
 Note: `validate-year.sh` runs only on `Write` (new file creation) because existing files may legitimately carry older copyright years.
 
+This table covers the core enforcement hooks. `settings.json` also wires additional hooks for verification, audit logging, and budget governance; see [Engineering Discipline](engineering-discipline.md) for the full catalog.
+
 ### Plugins
 
-Four official plugins are enabled:
+Five official plugins are enabled:
 
 ```json
 "enabledPlugins": {
   "code-review@claude-plugins-official": true,
   "code-simplifier@claude-plugins-official": true,
   "superpowers@claude-plugins-official": true,
-  "gopls-lsp@claude-plugins-official": true
+  "gopls-lsp@claude-plugins-official": true,
+  "clangd-lsp@claude-plugins-official": true
 }
 ```
 
@@ -214,11 +219,11 @@ See the [Plugins section](#plugins) below for details on each.
 ```json
 "sandbox": {
   "enabled": true,
-  "autoAllowBashIfSandboxed": true
+  "autoAllowBashIfSandboxed": false
 }
 ```
 
-The sandbox is on by default. When running sandboxed, Bash commands are automatically allowed without per-command prompts (the permission system above takes precedence for blocking).
+The sandbox is on by default. `autoAllowBashIfSandboxed` is `false`, so running inside the sandbox does not bypass the permission system: sandboxed Bash commands still go through the same allow/deny/ask evaluation as unsandboxed ones, and the sandbox's filesystem/network restrictions apply on top.
 
 ### Environment variables
 
@@ -233,7 +238,7 @@ Enables the experimental agent teams feature, allowing Claude to dispatch parall
 ### Other settings
 
 - `"respectGitignore": true` — Files matched by `.gitignore` are excluded from context.
-- `"effortLevel": "medium"` — Default reasoning effort level for responses.
+- `"effortLevel": "high"` — Default reasoning effort level for responses.
 - `"attribution"` — Commit and PR attribution strings (empty strings mean no attribution suffix is appended).
 
 ### Network restrictions
@@ -412,11 +417,11 @@ Fix: Replace <STALE_YEAR> with 2026 (or use a range ending in 2026, e.g., <STALE
 
 ## Plugins
 
-Four plugins from the official Claude plugins registry are enabled. Plugin metadata is stored in `.claude/plugins/installed_plugins.json`.
+Five plugins from the official Claude plugins registry are enabled. Plugin metadata is stored in `.claude/plugins/installed_plugins.json`.
 
 ### code-review
 
-**Version:** `8deab8460a9d` | **Registry:** `claude-plugins-official`
+**Version:** `ca6eb4c4bd53` | **Registry:** `claude-plugins-official`
 
 Provides automated code review suggestions and a `code-reviewer` agent. Use it to get structured feedback on diffs, pull requests, or individual files — covering correctness, security, readability, and adherence to project conventions.
 
@@ -428,7 +433,7 @@ Analyzes code and suggests targeted simplifications: reducing nesting, eliminati
 
 ### superpowers
 
-**Version:** `4.3.0` | **Registry:** `claude-plugins-official`
+**Version:** `5.1.0` | **Registry:** `claude-plugins-official`
 
 The primary workflow engine for this configuration. `superpowers` provides the skills that drive the engineering standards defined in `CLAUDE.md`:
 
@@ -443,13 +448,19 @@ The primary workflow engine for this configuration. `superpowers` provides the s
 | Skill authoring | Create and register new skills |
 | Debugging | Structured root-cause analysis workflows |
 
-`superpowers` is the largest and most important plugin in this setup. Most of the engineering standard workflows (brainstorm, TDD cycle phases, `/cove-verify`) are driven by skills it provides.
+`superpowers` is the largest and most important plugin in this setup. Most of the engineering standard workflows (brainstorm, TDD cycle phases, verification-before-completion) are driven by skills it provides.
 
 ### gopls-lsp
 
 **Version:** `1.0.0` | **Registry:** `claude-plugins-official`
 
 Integrates the [gopls](https://pkg.go.dev/golang.org/x/tools/gopls) Go language server into Claude Code sessions, providing Go-aware completions, type information, symbol navigation, and diagnostics. Particularly useful when navigating large Go codebases or when Claude needs accurate type resolution before writing implementation code.
+
+### clangd-lsp
+
+**Version:** `1.0.0` | **Registry:** `claude-plugins-official`
+
+Integrates the [clangd](https://clangd.llvm.org/) language server for C and C++ into Claude Code sessions, providing completions, type information, symbol navigation, and diagnostics for C/C++ sources. Useful when working in mixed Go/C or container-runtime codebases where Claude needs accurate C/C++ symbol resolution before writing implementation code.
 
 ---
 

@@ -108,3 +108,6 @@ scripts/leak-patterns.local
 .cursor/.deploy-version
 .cursor/docs/
 .cursor/skills/
+
+# ── MkDocs build output (never tracked) ──
+site/

@@ -23,6 +23,27 @@ same engineering standards automatically.
 | Blind `grep` to understand code | Query a Graphify code graph first, then read specifics |
 | No guardrails on dangerous commands | Guardrails on destructive commands (confirm force-push main; block `rm -rf /`) |
 
+## The Ideas Behind It
+
+The goal of this toolkit is to tune Claude Code into a disciplined engineering
+system — one where the standards hold whether or not anyone remembers them.
+Six ideas do the load-bearing work:
+
+1. **Enforcement over convention** — hooks fire on every relevant action, so a
+   rule cannot be skipped "just this once."
+2. **Evidence over claims** — verification runs before a session ends, and every
+   command is logged; "it works" is backed by output, not assertion.
+3. **Budget governance** — token spend is surfaced as it happens, not after.
+4. **Tests are contracts** — a test that stays green when the code breaks is
+   deleted and rewritten.
+5. **Failure → Eval** — a failure seen twice ships with an executable check that
+   goes red if it returns.
+6. **The orchestrator pattern** — fully-specified briefs, isolated worktrees,
+   report files, and an adversarial review gate before merge.
+
+Each idea maps to a shipped hook, rule, or skill you can read and adapt. See
+[Engineering Discipline](docs/engineering-discipline.md) for the walkthrough.
+
 ## Architecture Overview
 
 This repo is a mirror of your Claude Code and Cursor IDE configuration.
@@ -38,7 +59,7 @@ graph LR
 
 The repo layout mirrors the home directory exactly so rsync can deploy without
 path translation. See the [Architecture deep-dive](docs/architecture.md) for the
-agents-workbench pattern, worktree isolation model, and hook execution order.
+coordination-branch pattern, worktree isolation model, and hook execution order.
 
 ## Quick Start
 
@@ -63,14 +84,15 @@ steps, and a first-session walkthrough.
 |-----------|-------|---------|
 | **CLAUDE.md** | 1 | Engineering standards (TDD, worktrees, iteration budgets) |
 | **settings.json** | 1 | Permissions, hook wiring, plugin config, environment |
-| **Hooks** | 19 | inject-date, sign-commits, prevent-push-workbench, enforce-worktree, validate-year, tdd-guard, auto-format, bash-audit-log, build-helpers, context-watch, mutation-gate, permission-denied, pre-compact-context, reflection-staleness, session-goal-init, test-dep-map, test-quality-lint, graphify-graph-hint, verify-gate |
-| **Skills** | 14 | eureka, go-review, goal, handoff, k8s-debug, kickoff, pr-review-ingest, reflection, skill-eval, tdd-protocol, team-{plan,execute,shutdown}, worktree-guide — each ships a human-facing README; see the [Skills & Commands reference](docs/skills-and-commands.md) |
-| **Rules** | 8 | constitution, go/k8s/container conventions, git-workflow, security, graphify, learned-anti-patterns |
+| **Hooks** | 20 | inject-date, sign-commits, prevent-push-workbench, enforce-worktree, validate-year, tdd-guard, auto-format, bash-audit-log, budget-governor, build-helpers, context-watch, mutation-gate, permission-denied, pre-compact-context, reflection-staleness, session-goal-init, test-dep-map, test-quality-lint, graphify-graph-hint, verify-gate |
+| **Skills** | 15 | config-audit, eureka, go-review, goal, handoff, k8s-debug, kickoff, pr-review-ingest, reflection, skill-eval, tdd-protocol, team-{plan,execute,shutdown}, worktree-guide — each ships a human-facing README; see the [Skills & Commands reference](docs/skills-and-commands.md) |
+| **Rules** | 9 | constitution, go/k8s/container conventions, git-workflow, security, graphify, shell-conventions, learned-anti-patterns |
+| **Evals** | 1 | Failure→Eval framework (`.claude/evals/`) with a template and the `scripts/run-evals.sh` runner |
 | **Agents** | 4 | doc-writer, explorer, principal-engineer, qa-engineer |
 | **Commands** | 3 | team-plan, team-execute, team-shutdown (multi-agent coordination) |
 | **Team Library** | 11 | Architect reference material, planning guide, QA validator, decision templates |
 | **Policies** | 2 | remote-settings.json, policy-limits.json |
-| **Scripts** | 1 | setup-workbench.sh (initializes the agents-workbench branch) |
+| **Scripts** | 1 | setup-workbench.sh (initializes the local coordination branch) |
 | **Templates** | 1 | AGENTS.md template for task coordination |
 | **.claudeignore** | 1 | Context exclusions for large/irrelevant files |
 
@@ -87,9 +109,9 @@ steps, and a first-session walkthrough.
 
 ### Graphify code-graph integration
 
-[Graphify](https://pypi.org/project/graphify/) builds a queryable **code knowledge
-graph** so the agent navigates by structure instead of blind `grep` — a large token
-saving on big or unfamiliar codebases. This toolkit wires it in:
+Graphify builds a queryable **code knowledge graph** so the agent navigates by
+structure instead of blind `grep` — a large token saving on big or unfamiliar
+codebases. This toolkit wires it in:
 
 - **`scripts/graphify-bootstrap.sh [PATH]`** — builds the graph for a repo via
   `graphify update` (AST extraction; **no LLM, no API key**).
@@ -99,7 +121,8 @@ saving on big or unfamiliar codebases. This toolkit wires it in:
 - **`.claude/rules/graphify.md`** — the always-loaded directive on querying the graph.
 
 ```bash
-pipx install graphify             # one-time
+# Requires the graphify CLI (not yet published to PyPI — release pending).
+# Without it the integration degrades gracefully: the graph-hint hook stays silent.
 ./scripts/graphify-bootstrap.sh   # build graphify-out/graph.json for the current repo
 ```
 
@@ -107,7 +130,7 @@ pipx install graphify             # one-time
 
 - **TDD Guard**: Blocks implementation files without corresponding test files
 - **Signed Commits**: All commits require `-s -S` (DCO + GPG)
-- **Worktree Isolation**: Source is read-only on `agents-workbench`; implementation happens in `.worktrees/`
+- **Worktree Isolation**: Source is read-only on the local coordination branch; implementation happens in `.worktrees/`
 - **Year Validation**: New files must use the current year in copyright headers
 - **Security Gate**: Blocks dangerous commands (`rm -rf /`, force-push to main)
 - **Auto-format & test-quality-lint**: PostToolUse hooks format code and check test quality on every Write/Edit
@@ -118,7 +141,8 @@ pipx install graphify             # one-time
 | Document | Description |
 |----------|-------------|
 | [Getting Started](docs/getting-started.md) | Prerequisites, installation, verification |
-| [Architecture](docs/architecture.md) | agents-workbench deep-dive with diagrams |
+| [Engineering Discipline](docs/engineering-discipline.md) | The six ideas the toolkit enforces, each linked to its shipped implementation |
+| [Architecture](docs/architecture.md) | Coordination-branch and worktree deep-dive with diagrams |
 | [Claude Code](docs/claude-code.md) | Hooks, settings, plugins, policies |
 | [Cursor](docs/cursor.md) | Agents, commands, rules, hooks |
 | [Deployment](docs/deployment.md) | deploy.sh, capture.sh, diff.sh scripts |
@@ -132,7 +156,7 @@ pipx install graphify             # one-time
 - **jq** (for hooks that parse JSON)
 - **GPG** (for signed commits)
 - **rsync** (for deploy/capture scripts)
-- **graphify** (optional, for the code-graph integration: `pipx install graphify`)
+- **graphify** (optional, for the code-graph integration — CLI not yet published to PyPI; everything else works without it)
 
 ## Contributing
 

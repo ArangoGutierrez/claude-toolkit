@@ -1,0 +1,32 @@
+site_name: claude-toolkit
+site_description: An opinionated Claude Code and Cursor configuration that enforces engineering discipline through hooks, skills, and a worktree workflow.
+site_url: https://arangogutierrez.github.io/claude-toolkit/
+repo_url: https://github.com/ArangoGutierrez/claude-toolkit
+repo_name: ArangoGutierrez/claude-toolkit
+
+theme:
+  name: material
+  features:
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+
+nav:
+  - Home: README.md
+  - Getting Started: getting-started.md
+  - Engineering Discipline: engineering-discipline.md
+  - Architecture: architecture.md
+  - Claude Code: claude-code.md
+  - Cursor: cursor.md
+  - Deployment: deployment.md
+  - Skills & Commands: skills-and-commands.md
+  - Skill README Template: skill-readme-template.md
+  - Testing Agent Models: testing-agent-models.md

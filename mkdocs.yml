@@ -6,6 +6,16 @@ repo_name: ArangoGutierrez/claude-toolkit
 
 theme:
   name: material
+  palette:
+    # Dark mode is the default; first entry wins.
+    - scheme: slate
+      toggle:
+        icon: material/brightness-7
+        name: Switch to light mode
+    - scheme: default
+      toggle:
+        icon: material/brightness-4
+        name: Switch to dark mode
   features:
     - navigation.top
     - navigation.footer

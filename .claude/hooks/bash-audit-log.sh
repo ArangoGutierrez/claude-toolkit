@@ -26,7 +26,7 @@ COMMAND=$(echo "$COMMAND" | /usr/bin/sed -E \
 NL=$'\n'
 ESC='\n'   # literal backslash-n
 # Only LF is folded; a lone CR (CRLF/old-Mac line) persists as a raw mid-line
-# byte — cosmetic, the entry stays one physical line and the marker holds (EP-F).
+# byte — cosmetic, the entry stays one physical line and the marker holds.
 COMMAND=${COMMAND//$NL/$ESC}
 
 LOG_DIR="$HOME/.claude/audit"

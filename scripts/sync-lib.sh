@@ -31,6 +31,7 @@ is_curated() {
   local rel="$1" c
   for c in "${CURATED[@]}"; do
     # RHS deliberately unquoted: it's a bash glob pattern, not a literal string.
+    # shellcheck disable=SC2053
     [[ "$rel" == $c ]] && return 0
   done
   return 1

@@ -42,6 +42,11 @@
           "type": "string",
           "pattern": "^~/.cursor/hooks/[a-z-]+\\.sh$",
           "description": "Path to hook script"
+        },
+        "timeout": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Optional per-hook timeout in seconds"
         }
       },
       "additionalProperties": false

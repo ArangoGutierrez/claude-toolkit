@@ -1,0 +1,2 @@
+This is not a valid verdict. There's no VERDICT line.
+Just some prose that doesn't match the format.

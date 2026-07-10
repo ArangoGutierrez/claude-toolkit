@@ -388,3 +388,36 @@ The `team/lib/` subdirectory holds 11 files organized by concern:
 - **Quality:** `qa-validator.md` (validation checklist for git signatures, language checks, CI replication, PR metadata)
 
 The Principal Engineer reads these libraries at team startup and consults them when Workers escalate design decisions. The QA Engineer reads `qa-validator.md` to run its validation checklist. This material is what gives the team agents domain-specific knowledge beyond their base capabilities.
+
+---
+
+## The agentic engine
+
+Three independent call sites in this toolkit make LLM calls, and all three go through one seam.
+
+```mermaid
+graph TD
+  K["kickoff enrichment<br/>(tool.kickoff)"] --> B["tool.backends<br/>build_chat_model / invoke_llm"]
+  P["validate-recommendation panel<br/>(panel.dispatch)"] --> B
+  D["done evaluator<br/>(skills/done/eval.py)"] --> B
+  B --> O["any OpenAI-compatible endpoint<br/>OpenRouter · vLLM · NIM · Anthropic"]
+```
+
+**The three components:**
+
+- **`tool.kickoff`** turns a rough task opener into a scoped prompt, routed skills, and a verification checklist with one LLM call. Fail-open: if no model is reachable, the raw opener proceeds untouched.
+- **`panel.dispatch`** (the validate-recommendation skill) dispatches N configured panelists to review any `AskUserQuestion` carrying a `(Recommended)` option before it reaches the user.
+- **`skills/done/eval.py`** evaluates session-goal evidence against acceptance criteria before a `/done confirm` or `/done abandon` is accepted.
+
+**The seam:** none of the three call a provider SDK directly. Each builds a request — system/user prompt, model, temperature — and hands it to `tool.backends.build_chat_model` or `invoke_llm`. The seam is the only code that knows how to construct a `nat-nim` (NVIDIA NIM), `nat-anthropic`, or `nat-openai` (any OpenAI-compatible endpoint) client, so a new call site never re-implements provider wiring.
+
+**Env contract** (each row is independent — the three components do not share env var names):
+
+| Component | Model | Backend | Endpoint override | API key override |
+|---|---|---|---|---|
+| kickoff | `KICKOFF_MODEL` | `KICKOFF_BACKEND` (default `nat-nim`) | — | — |
+| done | `DONE_NAT_MODEL` | `DONE_BACKEND` (default `nat-nim`) | `DONE_NAT_ENDPOINT` | `DONE_NAT_API_KEY` |
+| generic `nat-openai` backend | — | — | `OPENAI_BASE_URL` | `OPENAI_API_KEY` |
+| panel | per-panelist `model`/`backend` in `config.yml` | see [Panel Config](patterns/panel-config.md) | | |
+
+The panel's config file (`~/.claude/panel/config.yml`, deployed from the template at `.claude/panel/config.yml.template`) is the one place backend selection is per-panelist rather than a single env var — see [Panel Config](patterns/panel-config.md) for the field-by-field walkthrough.

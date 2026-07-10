@@ -1,0 +1,7 @@
+{
+  "error": {
+    "message": "rate limit exceeded",
+    "type": "rate_limit_error",
+    "code": "429"
+  }
+}

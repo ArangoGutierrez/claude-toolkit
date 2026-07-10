@@ -42,6 +42,9 @@ is_curated() {
 GENERIC_LEAK_PATTERNS=(
   '/Users/[A-Za-z0-9._-]+'
   '/home/[A-Za-z0-9._-]+'
+  # Hub-form (double-namespace) model IDs are internal-catalog references and
+  # must never ship publicly; single-namespace public catalog IDs are fine.
+  'nvidia/nvidia/'
 )
 
 # Documented placeholder paths that legitimately appear in tracked docs and

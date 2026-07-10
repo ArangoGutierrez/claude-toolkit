@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-test-overturn",
+  "object": "chat.completion",
+  "model": "test-model",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "VERDICT: OVERTURN\nRATIONALE: The recommendation overlooks that the existing client wrapper already handles retries. Choosing this option would result in double-retry on transient failures. Option B sidesteps this entirely. The recommendation is technically functional but introduces a subtle bug in retry semantics.\nALTERNATIVE: Option B",
+        "reasoning_content": "Internal reasoning..."
+      }
+    }
+  ],
+  "usage": {
+    "completion_tokens": 120,
+    "prompt_tokens": 50,
+    "total_tokens": 170
+  }
+}

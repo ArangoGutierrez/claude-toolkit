@@ -1,0 +1,3 @@
+VERDICT: OVERTURN
+RATIONALE: Option A violates atomicity by bundling logging changes with the core fix. Per ~/.claude/CLAUDE.md, ">1 concern → break down first." Option C isolates the fix and defers logging.
+ALTERNATIVE: Option C

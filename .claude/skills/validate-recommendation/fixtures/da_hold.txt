@@ -1,0 +1,3 @@
+VERDICT: HOLD
+RATIONALE: After examining options A, B, and C, no stronger counter found. Option A's reasoning around atomicity holds; B introduces unnecessary indirection by adding a wrapper layer that doesn't pull its weight, and C couples concerns the user explicitly wanted to keep separate. The honest answer is that A is the right choice for the stated constraints.
+ALTERNATIVE: n/a

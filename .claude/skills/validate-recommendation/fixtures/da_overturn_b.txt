@@ -1,0 +1,3 @@
+VERDICT: OVERTURN
+RATIONALE: Option A assumes the caller controls retry semantics, but the existing client wrapper already retries. Choosing A double-retries on transient failures. Option B sidesteps this entirely.
+ALTERNATIVE: Option B

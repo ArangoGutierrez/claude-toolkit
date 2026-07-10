@@ -7,7 +7,7 @@
 What this configuration adds:
 
 - **Engineering standards** codified in `CLAUDE.md` — a mandatory brainstorm-first policy, a full TDD protocol (Plan→Red→Green→Refactor), an iteration budget, and a clear priority stack (Security > Correctness > Performance > Style).
-- **Enforcement hooks** that make the standards machine-checkable — six shell scripts that intercept file writes and Bash commands before Claude executes them, blocking violations with actionable error messages.
+- **Enforcement hooks** that make the standards machine-checkable — core shell scripts that intercept file writes and Bash commands before Claude executes them, blocking violations with actionable error messages. The toolkit ships more hooks for verification, audit logging, and budget governance; see [Engineering Discipline](engineering-discipline.md) for the full catalog.
 - **A plugin ecosystem** — four official plugins covering code review, code simplification, Go language server integration, and the `superpowers` workflow engine that drives brainstorming, TDD, worktree management, and parallel agent dispatch.
 - **A fine-grained permissions model** — explicit allow/deny/ask lists for every tool Claude can call, plus a sandbox with network restrictions for remote use.
 
@@ -31,6 +31,8 @@ What this configuration adds:
 └── remote-settings.json    # Network restrictions for sandboxed/remote use
 ```
 
+The `hooks/` subtree above lists the **core** enforcement hooks documented on this page. The toolkit ships more hooks — for verification, audit logging, and budget governance — under `.claude/hooks/`; see [Engineering Discipline](engineering-discipline.md) for the full catalog.
+
 ---
 
 ## CLAUDE.md — Engineering Standards
@@ -40,7 +42,7 @@ What this configuration adds:
 ### Role
 
 ```
-Senior Principal Engineer. Rigor > speed.
+Senior engineer mindset. Rigor > speed.
 ```
 
 The persona sets the tone: correctness and deliberate design take precedence over moving fast. Every decision should be defensible.
@@ -63,7 +65,7 @@ Exempt tasks (tasks where brainstorming is skipped entirely): fixing typos, addi
 |-----------|---------|
 | **Atomicity** | If a task has more than one concern, break it down before starting |
 | **No placeholders** | Complete, runnable code only — no `// TODO: implement` stubs |
-| **Verify** | Use the `/cove-verify` skill (Chain-of-Verification protocol) after implementation |
+| **Verify before claiming** | Any response claiming a task is complete must include the output of a verification command (test, build, or lint) in that same response |
 | **YAGNI** | Do not add abstractions the current task does not require |
 | **≥3 options** | Produce at least three design alternatives before committing to one |
 
@@ -193,6 +195,8 @@ Hooks are shell scripts that intercept Claude's tool calls before they execute. 
 | `PreToolUse` | `Edit` | `enforce-worktree.sh`, `tdd-guard.sh` |
 
 Note: `validate-year.sh` runs only on `Write` (new file creation) because existing files may legitimately carry older copyright years.
+
+This table covers the core enforcement hooks. `settings.json` also wires additional hooks for verification, audit logging, and budget governance; see [Engineering Discipline](engineering-discipline.md) for the full catalog.
 
 ### Plugins
 
@@ -443,7 +447,7 @@ The primary workflow engine for this configuration. `superpowers` provides the s
 | Skill authoring | Create and register new skills |
 | Debugging | Structured root-cause analysis workflows |
 
-`superpowers` is the largest and most important plugin in this setup. Most of the engineering standard workflows (brainstorm, TDD cycle phases, `/cove-verify`) are driven by skills it provides.
+`superpowers` is the largest and most important plugin in this setup. Most of the engineering standard workflows (brainstorm, TDD cycle phases, verification-before-completion) are driven by skills it provides.
 
 ### gopls-lsp
 

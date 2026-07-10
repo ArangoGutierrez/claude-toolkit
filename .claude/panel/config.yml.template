@@ -1,0 +1,49 @@
+version: 1
+
+# Copy to config.yml (same directory, deployed at ~/.claude/panel/) and adjust.
+# The panel reviews every AskUserQuestion carrying a "(Recommended)" option.
+#
+# Backends: nat-openai (ANY OpenAI-compatible endpoint: OpenRouter, vLLM,
+# llama.cpp, NIM, ...), nat-anthropic, nat-nim, claude-subagent.
+# nat-openai env: OPENAI_BASE_URL + OPENAI_API_KEY.
+#
+# PRIVACY: OpenRouter :free routes may log prompts for provider training;
+# use a paid route or a self-hosted endpoint for sensitive work.
+
+panelists:
+  - id: da
+    role: DA
+    enabled: true
+    backend: nat-openai
+    model: nvidia/nemotron-3-ultra-550b-a55b:free   # OpenRouter catalog ID ($0)
+    max_tokens: 32768
+    temperature: 0.3
+    timeout_seconds: 90
+
+  - id: pe
+    role: PE
+    enabled: false            # opt-in: spawns a Claude subagent
+    backend: claude-subagent
+    subagent_type: principal-engineer
+
+  - id: qa
+    role: QA
+    enabled: false            # opt-in
+    backend: claude-subagent
+    subagent_type: qa-engineer
+
+severity:
+  hard_threshold: majority
+  rationale_gate:
+    requires_principle_or_alternative: true
+
+failure_mode:
+  on_panelist_error: auto
+
+re_brainstorm:
+  enabled: true
+  max_cycles: 2
+
+telemetry:
+  jsonl: ~/.claude/panel/decisions.jsonl
+  otel_endpoint: null

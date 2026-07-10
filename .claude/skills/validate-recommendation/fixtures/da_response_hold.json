@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-test-hold",
+  "object": "chat.completion",
+  "model": "test-model",
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "VERDICT: HOLD\nRATIONALE: After examining the alternatives, no stronger counter was identified. The recommendation aligns with the stated goal of minimizing dependencies. Both alternatives introduce complexity without commensurate benefit. The honest assessment is that the recommendation stands.\nALTERNATIVE: n/a",
+        "reasoning_content": "Internal reasoning that should be ignored by the parser."
+      }
+    }
+  ],
+  "usage": {
+    "completion_tokens": 100,
+    "prompt_tokens": 50,
+    "total_tokens": 150
+  }
+}

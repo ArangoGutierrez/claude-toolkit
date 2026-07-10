@@ -60,20 +60,20 @@ These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each h
 
 | Skill | What it does |
 |-------|--------------|
-| [`/eureka`](../.claude/skills/eureka/README.md) | Capture a breakthrough before it evaporates |
-| [`/go-review`](../.claude/skills/go-review/README.md) | Systematic Go code review for correctness, concurrency, and performance |
-| [`/goal`](../.claude/skills/goal/README.md) | Record the session goal and acceptance criteria |
-| [`/handoff`](../.claude/skills/handoff/README.md) | Capture session state for a fresh start |
-| [`/k8s-debug`](../.claude/skills/k8s-debug/README.md) | Ordered triage for Kubernetes GPU workload failures |
-| [`/kickoff`](../.claude/skills/kickoff/README.md) | Turn a rough idea into a scoped, goal-tracked start |
-| [`/pr-review-ingest`](../.claude/skills/pr-review-ingest/README.md) | Turn PR review comments into rule proposals |
-| [`/reflection`](../.claude/skills/reflection/README.md) | Turn session mistakes into curated rules |
-| [`/skill-eval`](../.claude/skills/skill-eval/README.md) | Measure skill discoverability |
-| [`/tdd-protocol`](../.claude/skills/tdd-protocol/README.md) | The Red → Green → Mutate → Refactor cycle |
-| [`/team-plan`](../.claude/skills/team-plan/README.md) | Scope a multi-task project before spawning an agent team |
-| [`/team-execute`](../.claude/skills/team-execute/README.md) | Spawn the agent team to implement an approved plan |
-| [`/team-shutdown`](../.claude/skills/team-shutdown/README.md) | Retire a completed team engagement |
-| [`/worktree-guide`](../.claude/skills/worktree-guide/README.md) | Branch model and commands for agents-workbench worktrees |
+| [`/eureka`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/eureka/README.md) | Capture a breakthrough before it evaporates |
+| [`/go-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/go-review/README.md) | Systematic Go code review for correctness, concurrency, and performance |
+| [`/goal`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/goal/README.md) | Record the session goal and acceptance criteria |
+| [`/handoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/handoff/README.md) | Capture session state for a fresh start |
+| [`/k8s-debug`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/k8s-debug/README.md) | Ordered triage for Kubernetes GPU workload failures |
+| [`/kickoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/kickoff/README.md) | Turn a rough idea into a scoped, goal-tracked start |
+| [`/pr-review-ingest`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/pr-review-ingest/README.md) | Turn PR review comments into rule proposals |
+| [`/reflection`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/reflection/README.md) | Turn session mistakes into curated rules |
+| [`/skill-eval`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/skill-eval/README.md) | Measure skill discoverability |
+| [`/tdd-protocol`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/tdd-protocol/README.md) | The Red → Green → Mutate → Refactor cycle |
+| [`/team-plan`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-plan/README.md) | Scope a multi-task project before spawning an agent team |
+| [`/team-execute`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-execute/README.md) | Spawn the agent team to implement an approved plan |
+| [`/team-shutdown`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-shutdown/README.md) | Retire a completed team engagement |
+| [`/worktree-guide`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/worktree-guide/README.md) | Branch model and commands for agents-workbench worktrees |
 
 The three `team-*` skills are also exposed as slash commands in `.claude/commands/`. Note the two copies have drifted: the command files predate the skills' current form (they still use the "Distinguished Systems Engineer" role name and `team/lib/architect-*.md` reference paths, where the skills use "Principal Engineer" and `.claude/agents/*.md`). The SKILL.md trio is the source of truth for the process; reconciling the command copies is a tracked follow-up. The next section documents the commands as they currently exist.
 

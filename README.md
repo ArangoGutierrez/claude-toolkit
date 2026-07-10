@@ -109,9 +109,9 @@ steps, and a first-session walkthrough.
 
 ### Graphify code-graph integration
 
-[Graphify](https://pypi.org/project/graphify/) builds a queryable **code knowledge
-graph** so the agent navigates by structure instead of blind `grep` — a large token
-saving on big or unfamiliar codebases. This toolkit wires it in:
+Graphify builds a queryable **code knowledge graph** so the agent navigates by
+structure instead of blind `grep` — a large token saving on big or unfamiliar
+codebases. This toolkit wires it in:
 
 - **`scripts/graphify-bootstrap.sh [PATH]`** — builds the graph for a repo via
   `graphify update` (AST extraction; **no LLM, no API key**).
@@ -121,7 +121,8 @@ saving on big or unfamiliar codebases. This toolkit wires it in:
 - **`.claude/rules/graphify.md`** — the always-loaded directive on querying the graph.
 
 ```bash
-pipx install graphify             # one-time
+# Requires the graphify CLI (not yet published to PyPI — release pending).
+# Without it the integration degrades gracefully: the graph-hint hook stays silent.
 ./scripts/graphify-bootstrap.sh   # build graphify-out/graph.json for the current repo
 ```
 
@@ -155,7 +156,7 @@ pipx install graphify             # one-time
 - **jq** (for hooks that parse JSON)
 - **GPG** (for signed commits)
 - **rsync** (for deploy/capture scripts)
-- **graphify** (optional, for the code-graph integration: `pipx install graphify`)
+- **graphify** (optional, for the code-graph integration — CLI not yet published to PyPI; everything else works without it)
 
 ## Contributing
 

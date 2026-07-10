@@ -18,3 +18,5 @@ Welcome to the claude-toolkit documentation. This repo configures [Claude Code](
 | [Cursor Configuration](cursor.md) | Agents, commands, rules, and hooks |
 | [Deployment Scripts](deployment.md) | deploy.sh, capture.sh, and diff.sh explained |
 | [Skills & Commands Reference](skills-and-commands.md) | Complete reference of all slash commands and skills |
+| [Skill README Template](skill-readme-template.md) | The standard for per-skill README pages — agent-facing SKILL.md vs human-facing README.md |
+| [Testing Agent Models](testing-agent-models.md) | How to verify Cursor agents are configured with the intended model settings |

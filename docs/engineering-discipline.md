@@ -189,8 +189,9 @@ The toolkit ships the pieces to run this yourself:
   conventions, security) and [`qa-engineer`](../.claude/agents/qa-engineer.md)
   (test quality, mutation checks, CI replication) agents are this gate.
 
-Note what is **not** here: there is no single "run my whole team" command in
-this repository. The conductor that sequences all of the above is deliberately
+Note what is **not** here: no single command runs the whole
+plan → execute → review → merge loop end to end. The conductor that
+sequences all of the above is deliberately
 left out, because the right orchestration depends on your repository, your CI,
 and your risk tolerance. What ships is the *pattern* and its building blocks —
 wire them into a loop that fits your project. Documenting the pattern is the

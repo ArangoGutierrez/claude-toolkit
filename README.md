@@ -138,6 +138,8 @@ codebases. This toolkit wires it in:
 
 ## Documentation
 
+Browse the rendered docs at **<https://arangogutierrez.github.io/claude-toolkit/>**, or read them in-repo:
+
 | Document | Description |
 |----------|-------------|
 | [Getting Started](docs/getting-started.md) | Prerequisites, installation, verification |

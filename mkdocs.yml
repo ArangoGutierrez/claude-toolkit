@@ -39,6 +39,10 @@ nav:
       - OpenRouter Free-Tier Backend: patterns/openrouter-free-tier.md
       - Model ID Hygiene: patterns/model-id-hygiene.md
       - Panel Config: patterns/panel-config.md
+  - Examples:
+      - Kickoff on OpenRouter: examples/kickoff-openrouter.md
+      - Panel on OpenRouter: examples/panel-openrouter.md
+      - Done on OpenRouter: examples/done-openrouter.md
   - Claude Code: claude-code.md
   - Cursor: cursor.md
   - Deployment: deployment.md

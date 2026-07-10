@@ -27,7 +27,9 @@
 
 ## Examples
 
-<!-- populated by the examples task -->
+- [Kickoff on OpenRouter](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/examples/kickoff-openrouter.md): live kickoff enrichment run against a `:free` model, with captured output
+- [Panel on OpenRouter](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/examples/panel-openrouter.md): live validate-recommendation DA panelist dispatch, with captured verdict
+- [Done on OpenRouter](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/examples/done-openrouter.md): live done goal-evidence evaluation, with captured JSON verdict
 
 ## Engine source
 

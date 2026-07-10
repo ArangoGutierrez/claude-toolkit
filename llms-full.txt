@@ -2607,12 +2607,13 @@ These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each h
 
 | Skill | What it does |
 |-------|--------------|
+| [`/done`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/done/SKILL.md) | Close a session by grading the collected evidence against the goal — a NAT-backed evaluator (`skills/done/eval.py`) returning AGREE / DISAGREE / INSUFFICIENT_EVIDENCE, with `DONE_BACKEND` / `DONE_NAT_MODEL` selecting the provider and model. See [Done on OpenRouter](examples/done-openrouter.md) |
 | [`/eureka`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/eureka/README.md) | Capture a breakthrough before it evaporates |
 | [`/go-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/go-review/README.md) | Systematic Go code review for correctness, concurrency, and performance |
 | [`/goal`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/goal/README.md) | Record the session goal and acceptance criteria |
 | [`/handoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/handoff/README.md) | Capture session state for a fresh start |
 | [`/k8s-debug`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/k8s-debug/README.md) | Ordered triage for Kubernetes GPU workload failures |
-| [`/kickoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/kickoff/README.md) | Turn a rough idea into a scoped, goal-tracked start |
+| [`/kickoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/kickoff/README.md) | Turn a rough idea into a scoped, goal-tracked start. Backed by the shared agentic engine (the `tool.kickoff` package under `.claude/tool/`), with `KICKOFF_BACKEND` / `KICKOFF_MODEL` selecting the provider and model. See [Kickoff on OpenRouter](examples/kickoff-openrouter.md) |
 | [`/pr-review-ingest`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/pr-review-ingest/README.md) | Turn PR review comments into rule proposals |
 | [`/reflection`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/reflection/README.md) | Turn session mistakes into curated rules |
 | [`/skill-eval`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/skill-eval/README.md) | Measure skill discoverability |
@@ -2620,7 +2621,10 @@ These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each h
 | [`/team-plan`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-plan/README.md) | Scope a multi-task project before spawning an agent team |
 | [`/team-execute`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-execute/README.md) | Spawn the agent team to implement an approved plan |
 | [`/team-shutdown`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-shutdown/README.md) | Retire a completed team engagement |
+| [`/validate-recommendation`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/validate-recommendation/README.md) | Review every `(Recommended)` option in an `AskUserQuestion` via configured panelists — a `PreToolUse` hook, per-role personas, and a `panel/config.yml` (copied from `config.yml.template`) where each panelist's backend and model are set. See [Panel Config](patterns/panel-config.md) and [Panel on OpenRouter](examples/panel-openrouter.md) |
 | [`/worktree-guide`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/worktree-guide/README.md) | Branch model and commands for agents-workbench worktrees |
+
+The engine-backed skills — `/kickoff`, `/done`, and `/validate-recommendation` — share one agentic engine under `.claude/tool/` (its provider seam is `tool.backends`); their `KICKOFF_*` / `DONE_*` env vars and the panel `config.yml` choose the backend and model. `/done` is procedure-only — its `SKILL.md` and `eval.py`, without a standalone README yet — so its row links the `SKILL.md`.
 
 The three `team-*` skills are also exposed as slash commands in `.claude/commands/`. Note the two copies have drifted: the command files predate the skills' current form (they still use the "Distinguished Systems Engineer" role name and `team/lib/architect-*.md` reference paths, where the skills use "Principal Engineer" and `.claude/agents/*.md`). The SKILL.md trio is the source of truth for the process; reconciling the command copies is a tracked follow-up. The next section documents the commands as they currently exist.
 
@@ -3249,3 +3253,222 @@ in-process as a spawned agent.
   [OpenRouter Free-Tier Backend](openrouter-free-tier.md) applies: free
   routes may log prompts for provider training. Use a paid route or a
   self-hosted endpoint for panelists reviewing sensitive design decisions.
+
+===== docs/examples/kickoff-openrouter.md =====
+
+# Example: kickoff enrichment on OpenRouter
+
+## What this shows
+
+The `/kickoff` skill turns a one-line idea into a scoped prompt, a routed
+skill list, and a runnable verification checklist. Under the hood its
+`enrich.sh` shim calls the shared agentic engine (`tool.kickoff`), which runs
+a tool-calling LLM loop that inspects the repo before answering. This page
+runs that engine end to end against a `:free` OpenRouter model — no paid key,
+no mock.
+
+## Setup
+
+Point the generic OpenAI-compatible env vars at OpenRouter and route the
+kickoff engine through the `nat-openai` backend (see
+[OpenRouter Free-Tier Backend](../patterns/openrouter-free-tier.md)):
+
+```bash
+export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+export OPENAI_API_KEY=sk-or-...                       # your OpenRouter key
+export KICKOFF_BACKEND=nat-openai
+export KICKOFF_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+```
+
+## Run
+
+From a repo checkout, feed the engine a rough idea:
+
+```bash
+PYTHONPATH="$PWD/.claude" \
+  bash .claude/skills/kickoff/scripts/enrich.sh --mode interactive \
+  'add a --json flag to my CLI tool'
+```
+
+`enrich.sh` is fail-open: on any engine or model error it prints a
+`KICKOFF_PASSTHROUGH:` marker and exits 0, so a missing key never blocks your
+session. A successful run starts with a `## Kickoff` block.
+
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+
+```text
+## Kickoff
+**Scoped prompt:** Add a `--json` flag to the `deploy.sh` CLI script that outputs deployment results in structured JSON format. When `--json` is provided, the script should emit a single JSON object to stdout containing: deployment status (success/failure), dry-run mode flag, backup info (path or skipped), deployed components (.claude, .cursor), verification results (key files, hooks, JSON validation), and any errors. The existing human-readable output should remain on stderr when `--json` is used. Apply the same pattern to `capture.sh` and `diff.sh` for consistency.
+**Intent:** The deploy/capture/diff scripts are the primary CLI interface for this toolkit. Adding `--json` enables programmatic consumption by CI/CD pipelines, automation scripts, and other tools that need structured deployment/capture/diff results without parsing human-readable output.
+**Out of scope:**
+- Do not modify the public API of any Python modules (none exist in this repo)
+- Do not change existing flag behavior or default output format
+- Do not add external dependencies (jq, python) for JSON generation — use bash built-ins
+- Do not modify sync-lib.sh or other shared libraries
+- Only modify scripts/deploy.sh, scripts/capture.sh, scripts/diff.sh
+**Skills:** none
+**Execution:** solo
+**Budget:** 300k
+**Grounded in:** README.md, scripts/capture.sh, scripts/deploy.sh, scripts/diff.sh, scripts/graphify-bootstrap_test.sh
+**Verification checklist:**
+- [REJECTED: shell metacharacter '>'] deploy.sh --json outputs valid JSON with expected fields — `bash scripts/deploy.sh --dry-run --json 2>/dev/null | python3 -c "import json,sys; json.load(sys.stdin); print('OK')"`
+- [REJECTED: shell metacharacter '>'] deploy.sh --json includes deployment status, backup info, verification results — `bash scripts/deploy.sh --dry-run --json 2>/dev/null | python3 -c "import json,sys; d=json.load(sys.stdin); assert 'status' in d and 'backup' in d and 'verification' in d; print('OK')"`
+- [REJECTED: shell metacharacter '>&'] deploy.sh without --json still works normally — `bash scripts/deploy.sh --dry-run --help 2>&1 | head -20`
+- [REJECTED: shell metacharacter '>&'] capture.sh --json outputs valid JSON — `bash scripts/capture.sh --help 2>&1 | head -10`
+- [REJECTED: shell metacharacter '>&'] diff.sh --json outputs valid JSON — `bash scripts/diff.sh --help 2>&1 | head -10`
+
+Acceptance (runnable):
+(none proven runnable)
+```
+
+The engine grounded its answer in the repo's actual files (`deploy.sh`,
+`capture.sh`, `diff.sh`) — it read them during the tool-calling loop before
+scoping the prompt. The `[REJECTED: ...]` markers are the validator rejecting
+checklist commands that contain shell metacharacters, a guardrail against
+suggesting unsafe verification commands.
+
+## Privacy
+
+This example sends your prompt through OpenRouter's free tier. OpenRouter free
+routes may log prompts for provider training; use a paid route or a
+self-hosted endpoint for anything sensitive.
+
+===== docs/examples/panel-openrouter.md =====
+
+# Example: validate-recommendation panel on OpenRouter
+
+## What this shows
+
+The validate-recommendation panel reviews every `(Recommended)` option in an
+`AskUserQuestion` by dispatching one or more configured panelists. This page
+dispatches a single devil's-advocate (`DA`) panelist against a sample question
+and captures its verdict, running the panelist's `nat-openai` backend against
+a `:free` OpenRouter model.
+
+## Setup
+
+Copy the panel config template into place (see
+[Panel Config](../patterns/panel-config.md)):
+
+```bash
+cp .claude/panel/config.yml.template ~/.claude/panel/config.yml
+```
+
+The template's `da` panelist already targets the `nat-openai` backend with a
+`:free` catalog model:
+
+```yaml
+panelists:
+  - id: da
+    role: DA
+    enabled: true
+    backend: nat-openai
+    model: nvidia/nemotron-3-ultra-550b-a55b:free   # OpenRouter catalog ID ($0)
+```
+
+Point the OpenAI-compatible env vars at OpenRouter:
+
+```bash
+export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+export OPENAI_API_KEY=sk-or-...                       # your OpenRouter key
+```
+
+## Run
+
+Write a sample question to a prompt file in the DA persona's template shape,
+then dispatch the panelist:
+
+```bash
+cat > /tmp/panel-prompt.txt <<'EOF'
+Question: Which HTTP client should a small Go service use?
+Options (verbatim labels and descriptions):
+  Option A (Recommended) — net/http; standard library, zero dependencies
+  Option B — resty; third-party client with built-in retries
+  Option C — fasthttp; faster but an incompatible interface
+Assistant's recommended option: Option A (Recommended)
+Assistant's stated reasoning: The standard library covers the service's needs and avoids dependency and maintenance cost.
+EOF
+
+PYTHONPATH="$PWD/.claude:$PWD/.claude/skills/validate-recommendation" \
+  python3.12 -m panel dispatch --panelist da \
+  --config ~/.claude/panel/config.yml \
+  --persona .claude/skills/validate-recommendation/personas/da.md \
+  --prompt-file /tmp/panel-prompt.txt --output /tmp/da.verdict
+cat /tmp/da.verdict
+```
+
+The DA persona emits a strict `VERDICT: HOLD | OVERTURN` line with a rationale
+and, on `OVERTURN`, the verbatim option label it prefers instead.
+
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+
+```text
+VERDICT: OVERTURN
+RATIONALE: The recommendation assumes the standard library "covers the service's needs" without knowing what those needs are. For any service making outbound HTTP calls, automatic retry with backoff is a near-universal resilience requirement; net/http provides none, forcing the team to write and maintain custom retry logic — a subtle, error-prone task that resty solves out of the box. Dismissing a mature, well-maintained dependency like resty on principle ignores the hidden maintenance cost of reimplementing its core features poorly.
+ALTERNATIVE: Option B — resty; third-party client with built-in retries
+```
+
+The panelist overturned the recommendation and named a concrete alternative
+(`Option B`) — exactly the adversarial second opinion the panel exists to
+surface before a `(Recommended)` option is auto-accepted.
+
+## Privacy
+
+This example sends the sample question through OpenRouter's free tier.
+OpenRouter free routes may log prompts for provider training; use a paid route
+or a self-hosted endpoint for panelists reviewing sensitive design decisions.
+
+===== docs/examples/done-openrouter.md =====
+
+# Example: done goal-evidence evaluation on OpenRouter
+
+## What this shows
+
+The `/done` skill closes a session by grading the collected evidence against
+the session goal. Its `eval.py` reads a JSON payload — the goal stanza, the
+evidence bullets accrued during the session, and the user's MET/UNMET claim —
+and returns a JSON verdict: `AGREE`, `DISAGREE`, or `INSUFFICIENT_EVIDENCE`.
+This page runs that evaluator against a `:free` OpenRouter model.
+
+## Setup
+
+Route the done evaluator through the `nat-openai` backend and point the
+OpenAI-compatible env vars at OpenRouter (see
+[OpenRouter Free-Tier Backend](../patterns/openrouter-free-tier.md)):
+
+```bash
+export OPENAI_BASE_URL=https://openrouter.ai/api/v1
+export OPENAI_API_KEY=sk-or-...                       # your OpenRouter key
+export DONE_BACKEND=nat-openai
+export DONE_NAT_MODEL=nvidia/nemotron-3-ultra-550b-a55b:free
+```
+
+## Run
+
+Feed `eval.py` a payload on stdin:
+
+```bash
+printf '%s' '{"goal_stanza":"Goal: demo\nAcceptance:\n- tests pass","evidence":[{"bullet":"tests pass","raw":"pytest: 12 passed"}],"user_claim":"MET"}' \
+  | PYTHONPATH="$PWD/.claude" python3.12 .claude/skills/done/eval.py
+```
+
+On any internal failure (model unreachable, unparseable response) the
+evaluator returns `{"verdict": "ERROR", ...}` and the `/done` skill falls back
+to the user's own claim — the evaluation never blocks closing a session.
+
+## Output (captured live via an OpenAI-compatible endpoint, 2026-07-10 — the structure is identical on OpenRouter):
+
+```json
+{"verdict": "AGREE", "rationale": "The acceptance criterion \"tests pass\" is directly supported by the evidence record showing \"pytest: 12 passed\", which indicates that the test suite executed successfully with all tests passing. This satisfies the requirement that tests pass, as the evidence demonstrates a successful test run with zero failures. No contradictory information is present.", "gaps": []}
+```
+
+The evaluator agreed with the user's `MET` claim because the single evidence
+bullet directly satisfies the lone acceptance criterion. A missing or
+contradictory bullet would instead yield `DISAGREE` or
+`INSUFFICIENT_EVIDENCE`, with the shortfall named in `gaps`.
+
+## Privacy
+
+This example sends the goal stanza and evidence through OpenRouter's free
+tier. OpenRouter free routes may log prompts for provider training; use a paid
+route or a self-hosted endpoint for anything sensitive.

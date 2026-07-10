@@ -1,0 +1,38 @@
+# claude-toolkit
+
+> An opinionated Claude Code and Cursor configuration that enforces
+> engineering discipline — TDD, signed commits, worktree isolation, and an
+> agentic engine (kickoff enrichment, a recommendation panel, a goal
+> evaluator) — through hooks and skills.
+
+## Docs
+
+- [README](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/README.md): documentation index
+- [Getting Started](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/getting-started.md): prerequisites, installation, first workflow
+- [Engineering Discipline](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/engineering-discipline.md): the six enforced ideas and their implementations
+- [Architecture](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/architecture.md): coordination-branch/worktree architecture, plus the agentic engine
+- [Claude Code Configuration](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/claude-code.md): hooks, settings, plugins, policies
+- [Cursor Configuration](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/cursor.md): agents, commands, rules, hooks
+- [Deployment Scripts](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/deployment.md): deploy.sh, capture.sh, diff.sh
+- [Skills & Commands Reference](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/skills-and-commands.md): every slash command and skill
+- [Skill README Template](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/skill-readme-template.md): SKILL.md vs README.md standard
+- [Testing Agent Models](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/testing-agent-models.md): verifying Cursor agent model settings
+- [Agents](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/agents.md): how an agent should traverse this repo's docs
+
+## Patterns
+
+- [OpenRouter Free-Tier Backend](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/openrouter-free-tier.md): running the engine at $0 against OpenRouter's `:free` catalog
+- [Model ID Hygiene](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/model-id-hygiene.md): single- vs double-namespace catalog IDs and the sync gate
+- [Panel Config](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/panel-config.md): validate-recommendation panel config.yml walkthrough
+
+## Examples
+
+<!-- populated by the examples task -->
+
+## Engine source
+
+- [tool.kickoff](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/.claude/tool/kickoff.py): kickoff enrichment
+- [tool.backends](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/.claude/tool/backends.py): the provider seam (build_chat_model / invoke_llm)
+- [panel.dispatch](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/.claude/skills/validate-recommendation/panel/dispatch.py): validate-recommendation panel dispatch
+- [done evaluator](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/.claude/skills/done/eval.py): session-goal evidence evaluation
+- [panel config template](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/.claude/panel/config.yml.template): panelist config template

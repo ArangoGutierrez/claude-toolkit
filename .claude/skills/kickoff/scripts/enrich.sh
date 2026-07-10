@@ -5,7 +5,11 @@ set -uo pipefail
 
 PASSTHROUGH_PREFIX="KICKOFF_PASSTHROUGH:"
 PY="${CLAUDE_TOOL_PYTHON:-${CLAUDE_PANEL_PYTHON:-python3.12}}"
-export PYTHONPATH="${PYTHONPATH:-$HOME/.claude}"
+# Resolve the engine from THIS script's own .claude tree (works identically
+# deployed at ~/.claude and inside a repo checkout); PYTHONPATH still wins.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLAUDE_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+export PYTHONPATH="${PYTHONPATH:-$CLAUDE_ROOT}"
 
 passthrough() { printf '%s enrichment unavailable (%s)\n' "$PASSTHROUGH_PREFIX" "$1"; exit 0; }
 

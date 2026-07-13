@@ -21,8 +21,10 @@ security, and best-practice issues — not style that yamllint/CI already handle
    ```bash
    changed=$(git diff --name-only --diff-filter=d HEAD~1 -- '*.yaml' '*.yml')
    # Validate changed manifests against the K8s schema, or dry-run against a live cluster
-   command -v kubeconform >/dev/null && printf '%s\n' $changed | xargs -r kubeconform -strict -summary
-   command -v kubectl     >/dev/null && kubectl apply --dry-run=server -f $changed  # needs a cluster context
+   for f in $changed; do
+     command -v kubeconform >/dev/null && kubeconform -strict -summary "$f"
+     command -v kubectl     >/dev/null && kubectl apply --dry-run=server -f "$f"  # needs a cluster context
+   done
    # Helm charts — lint and render with default AND each values-*.yaml in the PR
    command -v helm >/dev/null && helm lint ./chart && helm template ./chart
    command -v helm >/dev/null && for v in ./chart/values-*.yaml; do helm template ./chart -f "$v"; done

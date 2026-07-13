@@ -13,16 +13,18 @@ for a full-tree review.
   YAML 1.1 but some parsers read it as the integer `644`. Right: use the explicit decimal the
   field expects (`defaultMode: 420`) or confirm your parser's YAML version and quote intentionally.
 - [ ] **Numeric-looking strings** — versions and dotted/colon values silently coerce:
-  `version: 1.10` becomes the float `1.1`; `time: 10:00` is base-60 under YAML 1.1. Right: quote
-  them — `version: "1.10"`.
+  `version: 1.10` becomes the float `1.1`; strict YAML 1.1 parsers may read `10:00` as a base-60
+  int. Right: quote them — `version: "1.10"`.
 - [ ] **String vs int for ports/UIDs** — `containerPort`/`runAsUser` are ints; `targetPort` may
   be an int or a named port string. A named `targetPort: web` must match a declared port `name`.
   Type drift fails schema validation. Right: match the field's declared type.
-- [ ] **Duplicate map keys** — a repeated key (two `env:` blocks, a key set twice) is last-wins
-  and silently drops the earlier value. Right: one key per map; catch with `yamllint`/`kubeconform`.
-- [ ] **List-under-map indentation** — a `- name:` list item indented at the map-key column parses
-  as a sibling mapping, not a list entry, silently dropping the container/volume. Right: indent
-  list items one level under their key.
+- [ ] **Duplicate map keys** — a repeated key (two `env:` blocks, a key set twice): strict tooling
+  (kubectl, yamllint) errors, but non-strict go-yaml paths are last-wins and silently drop the
+  earlier value. Right: one key per map; catch with `yamllint`/`kubeconform`.
+- [ ] **List-item de-indentation** — sequence items at the parent key's column are valid YAML (the
+  ubiquitous `containers:` / `- name:` style); the silent-drop trap is a field de-indented out of
+  its list element, which escapes the item and becomes a sibling of the parent map. Right: keep
+  every field of an item aligned inside its `-` block; catch misalignment with `yamllint`.
 - [ ] **Anchors/aliases and merge keys** — `&a`/`*a` share a mutable node and `<<` merge keys are
   not expanded by all K8s tooling; an edit through one alias mutates every user. Right: prefer
   explicit duplication, or Helm/Kustomize for reuse.
@@ -92,8 +94,9 @@ for a full-tree review.
   available. Right: `topologySpreadConstraints` or pod anti-affinity across nodes/zones.
 - [ ] **Standard labels** — `app.kubernetes.io/name`, `/instance`, `/version`, `/component`,
   `/part-of`, `/managed-by` enable tooling interop and selection. Right: apply the recommended set.
-- [ ] **Deployment selector immutability** — `.spec.selector` cannot change after create; a diff
-  that mutates an existing selector forces delete+recreate. Right: flag any selector mutation.
+- [ ] **Deployment selector immutability** — `.spec.selector` cannot change after create; the API
+  server rejects the update, and shipping it requires a manual delete+recreate. Right: flag any
+  selector mutation.
 - [ ] **CRD hygiene** — status subresource enabled, printer columns for key fields, `storage: true`
   on exactly one version, and a conversion webhook when multiple versions coexist. Right: a CRD
   missing these is hard to operate and upgrade.

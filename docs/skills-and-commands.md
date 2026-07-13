@@ -65,15 +65,19 @@ These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each h
 | [`/go-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/go-review/README.md) | Systematic Go code review for correctness, concurrency, and performance |
 | [`/goal`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/goal/README.md) | Record the session goal and acceptance criteria |
 | [`/handoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/handoff/README.md) | Capture session state for a fresh start |
+| [`/js-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/js-review/README.md) | JavaScript/TypeScript/Node review — async correctness, TS strictness, dependency hygiene, JS security |
 | [`/k8s-debug`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/k8s-debug/README.md) | Ordered triage for Kubernetes GPU workload failures |
+| [`/k8s-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/k8s-review/README.md) | Kubernetes review — YAML and Helm correctness, API best practices, RBAC least-privilege |
 | [`/kickoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/kickoff/README.md) | Turn a rough idea into a scoped, goal-tracked start. Backed by the shared agentic engine (the `tool.kickoff` package under `.claude/tool/`), with `KICKOFF_BACKEND` / `KICKOFF_MODEL` selecting the provider and model. See [Kickoff on OpenRouter](examples/kickoff-openrouter.md) |
 | [`/pr-review-ingest`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/pr-review-ingest/README.md) | Turn PR review comments into rule proposals |
+| [`/python-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/python-review/README.md) | Python review for AI/MLOps/agent code — typing, async correctness, agent-loop invariants, reproducibility, serialization safety |
 | [`/reflection`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/reflection/README.md) | Turn session mistakes into curated rules |
 | [`/skill-eval`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/skill-eval/README.md) | Measure skill discoverability |
 | [`/tdd-protocol`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/tdd-protocol/README.md) | The Red → Green → Mutate → Refactor cycle |
 | [`/team-plan`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-plan/README.md) | Scope a multi-task project before spawning an agent team |
 | [`/team-execute`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-execute/README.md) | Spawn the agent team to implement an approved plan |
 | [`/team-shutdown`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-shutdown/README.md) | Retire a completed team engagement |
+| [`/test-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/test-review/README.md) | Test and CI review — theater-test detection, e2e quality, GitHub Actions and Prow correctness |
 | [`/validate-recommendation`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/validate-recommendation/README.md) | Review every `(Recommended)` option in an `AskUserQuestion` via configured panelists — a `PreToolUse` hook, per-role personas, and a `panel/config.yml` (copied from `config.yml.template`) where each panelist's backend and model are set. See [Panel Config](patterns/panel-config.md) and [Panel on OpenRouter](examples/panel-openrouter.md) |
 | [`/worktree-guide`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/worktree-guide/README.md) | Branch model and commands for agents-workbench worktrees |
 

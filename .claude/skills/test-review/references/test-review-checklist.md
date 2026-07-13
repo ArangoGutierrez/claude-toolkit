@@ -153,9 +153,10 @@ survives deletion of its subject asserts nothing.
    runner. *Right:* pass through an `env:` variable and reference `"$VAR"` (env
    indirection); never inline the expression.
 
-5. **Secrets exposed to fork PRs** — secrets referenced in a workflow triggered by
-   fork `pull_request`. *Bites:* forks can exfiltrate them via a malicious change.
-   *Right:* gate secret-using jobs on trusted events, or use environments with
+5. **Secrets reachable from fork PRs** — plain fork `pull_request` runs get no secrets
+   by default; exposure comes from `pull_request_target` (item 3) or the repo opt-in
+   that sends secrets to fork runs. *Bites:* a malicious fork change exfiltrates them.
+   *Right:* keep secret-using jobs off fork-triggered events, or use environments with
    required reviewers.
 
 6. **Cache-key / restore-keys poisoning** — a `restore-keys` fallback that lets a

@@ -25,7 +25,7 @@ git diff --name-only HEAD~1 | grep -Ei '_test\.|(^|/)e2e|\.github/workflows/|pro
 2. **Run available CI linters** (and flag their absence if the repo ships CI without them):
 
 ```bash
-command -v actionlint >/dev/null && actionlint || echo "actionlint not installed"
+if command -v actionlint >/dev/null; then actionlint; else echo "actionlint not installed"; fi
 ```
 
 3. **Walk the checklist** (`references/test-review-checklist.md`):

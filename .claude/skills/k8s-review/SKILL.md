@@ -27,7 +27,7 @@ security, and best-practice issues — not style that yamllint/CI already handle
    done
    # Helm charts — lint and render with default AND each values-*.yaml in the PR
    command -v helm >/dev/null && helm lint ./chart && helm template ./chart
-   command -v helm >/dev/null && for v in ./chart/values-*.yaml; do helm template ./chart -f "$v"; done
+   command -v helm >/dev/null && for v in ./chart/values-*.yaml; do [ -e "$v" ] || continue; helm template ./chart -f "$v"; done
    # Extra static checks when available
    command -v kube-linter >/dev/null && kube-linter lint $changed
    ```

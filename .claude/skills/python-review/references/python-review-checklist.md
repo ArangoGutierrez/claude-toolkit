@@ -37,7 +37,7 @@ what you can point at in the changed lines.
   imports; a deferred import is acceptable only to break a cycle or gate an optional
   dep — and says so in a comment.
 - [ ] **`is` / `is not` on literals** (`x is "y"`, `n is 0`). Identity, not equality;
-  works by CInterpreter caching accident and breaks on other values. Right: `==` /
+  works by CPython caching accident and breaks on other values. Right: `==` /
   `!=`. Reserve `is` for `None`, `True`, `False`, and sentinels.
 - [ ] **Timezone-naive datetimes crossing a boundary.** `datetime.now()` /
   `utcnow()` (no tzinfo) serialized, compared, or stored against aware values
@@ -54,10 +54,12 @@ what you can point at in the changed lines.
   returns a coroutine object that is often silently truthy. pyright surfaces this
   only under strict `reportUnusedCoroutine`. Right: `await` it, or schedule with a
   kept task reference.
-- [ ] **`asyncio.gather` without `return_exceptions`.** The default cancels every
-  sibling on the first exception, dropping partial results you meant to keep.
+- [ ] **`asyncio.gather` without `return_exceptions`.** The default does NOT cancel
+  siblings: the first exception propagates to the awaiter while the other tasks keep
+  running unawaited — orphaned work whose later exceptions are silently swallowed.
   Right: `gather(..., return_exceptions=True)` and inspect each result when partial
-  failure is tolerable; leave the default only when fail-fast is intended.
+  failure is tolerable; use `asyncio.TaskGroup` (3.11+) when cancel-on-first-failure
+  is the behavior you actually want.
 - [ ] **Fire-and-forget tasks with no reference.** `asyncio.create_task(...)` whose
   result is not stored can be garbage-collected mid-flight, and its exception is
   swallowed. Right: keep the task in a set (discard on done) and attach a

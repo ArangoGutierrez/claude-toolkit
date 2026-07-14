@@ -186,14 +186,6 @@
       {
         "hooks": [
           {
-            "type": "prompt",
-            "prompt": "Check if the assistant's last response claims work is complete, fixed, or passing. If it does, verify: did the assistant actually run a verification command (test, build, lint) and show the output BEFORE making the claim? If the claim is unverified, respond with 'STOP: You claimed completion without running verification. Run the relevant test/build command first.' Otherwise respond with 'OK'."
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
             "type": "command",
             "command": "$HOME/.claude/hooks/context-watch.sh"
           }

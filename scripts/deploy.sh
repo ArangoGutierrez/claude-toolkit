@@ -29,6 +29,7 @@ CLAUDE_EXCLUDES=(
   plugins/known_marketplaces.json
   plugins/marketplaces/
   settings.local.json
+  settings.json
 )
 
 CURSOR_EXCLUDES=(

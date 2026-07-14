@@ -73,6 +73,11 @@ cd claude-toolkit
 The deploy script rsyncs `.claude/` and `.cursor/` to your home directory.
 A timestamped backup is created automatically before any files are overwritten.
 
+> **settings.json is a reference template.** `deploy.sh` deliberately does not
+> deploy it: copy it to `~/.claude/settings.json` once when adopting the
+> toolkit, then own it locally (your machine-specific hooks and env live
+> there). This prevents toolkit deploys from clobbering local registrations.
+
 See [Getting Started](docs/getting-started.md) for prerequisites, verification
 steps, and a first-session walkthrough.
 

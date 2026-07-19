@@ -126,10 +126,13 @@ codebases. This toolkit wires it in:
 - **`.claude/rules/graphify.md`** — the always-loaded directive on querying the graph.
 
 ```bash
-# Requires the graphify CLI (not yet published to PyPI — release pending).
+# Requires the graphify CLI: pipx install graphifyy
+# (the PyPI package is graphifyy; the command it installs is graphify)
 # Without it the integration degrades gracefully: the graph-hint hook stays silent.
 ./scripts/graphify-bootstrap.sh   # build graphify-out/graph.json for the current repo
 ```
+
+Full walkthrough: [Graphify guide](docs/graphify.md).
 
 ### Key Behaviors Enforced
 
@@ -150,6 +153,7 @@ Browse the rendered docs at **<https://arangogutierrez.github.io/claude-toolkit/
 | [Getting Started](docs/getting-started.md) | Prerequisites, installation, verification |
 | [Engineering Discipline](docs/engineering-discipline.md) | The six ideas the toolkit enforces, each linked to its shipped implementation |
 | [Architecture](docs/architecture.md) | Coordination-branch and worktree deep-dive with diagrams |
+| [Graphify](docs/graphify.md) | Getting started with the code-graph integration: install, bootstrap, query |
 | [Claude Code](docs/claude-code.md) | Hooks, settings, plugins, policies |
 | [Cursor](docs/cursor.md) | Agents, commands, rules, hooks |
 | [Deployment](docs/deployment.md) | deploy.sh, capture.sh, diff.sh scripts |
@@ -163,7 +167,7 @@ Browse the rendered docs at **<https://arangogutierrez.github.io/claude-toolkit/
 - **jq** (for hooks that parse JSON)
 - **GPG** (for signed commits)
 - **rsync** (for deploy/capture scripts)
-- **graphify** (optional, for the code-graph integration — CLI not yet published to PyPI; everything else works without it)
+- **graphify** (optional, for the code-graph integration — `pipx install graphifyy`; everything else works without it)
 
 ## Contributing
 

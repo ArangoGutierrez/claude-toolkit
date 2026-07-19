@@ -65,6 +65,9 @@ ISSUE_RESEARCH.md
 .plans/
 .prototypes/
 
+# Git worktrees (local-only, never tracked)
+.worktrees/
+
 # ── sync-gate local overrides (never tracked) ──
 # Identity-bearing leak patterns for scripts/sync-lib.sh; local-only.
 scripts/leak-patterns.local

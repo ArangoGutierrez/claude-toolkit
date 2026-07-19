@@ -63,7 +63,7 @@ Propose only. After user approval, create the artifact and append
 - Project-specific pattern → repo `.claude/rules/learned-anti-patterns.md`.
 - Universal pattern → global `~/.claude/rules/learned-anti-patterns.md`.
 - On duplicate pattern text, project overrides global (dedup is by pattern text,
-  not ID). Global edits reach `~/.claude` via `scripts/sync-to-home.sh`.
+  not ID). Global edits reach `~/.claude` via `scripts/deploy.sh` (repo root).
 
 ## Write Safety
 Before writing to `rules/learned-anti-patterns.md`:

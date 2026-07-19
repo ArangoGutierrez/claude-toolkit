@@ -76,5 +76,45 @@ check "pipe-description run" 0 "$rc"
 grep -qF '| `pipey` | `/pipey` | runs a \| b safely |' "$TMP/doc2.md" \
   && { pass=$((pass+1)); echo "PASS: pipe escaped in row"; } || { fail=$((fail+1)); echo "FAIL: pipe not escaped"; }
 
+# Case 6: END marker with trailing whitespace must be rejected LOUDLY with the
+# doc untouched — inexact markers previously deleted everything after the
+# table while printing OK (confirmed critical, live E2E 2026-07-19)
+printf '# T\n\n<!-- workflow-table:begin -->\nold\n<!-- workflow-table:end --> \n\ntail stays\n' > "$TMP/doc3.md"
+cp "$TMP/doc3.md" "$TMP/doc3.orig"
+rc=0; WORKFLOWS_DIR="$TMP/wf2" DOCS_FILE="$TMP/doc3.md" bash "$SUBJECT" 2>/dev/null || rc=$?
+check "inexact END marker rejected" 1 "$rc"
+if diff -q "$TMP/doc3.orig" "$TMP/doc3.md" > /dev/null; then pass=$((pass+1)); echo "PASS: doc untouched on inexact END"; else fail=$((fail+1)); echo "FAIL: doc modified on inexact END"; fi
+
+# Case 7: BEGIN marker with trailing whitespace — same contract (previously a
+# silent no-op that still printed OK)
+printf '# T\n\n<!-- workflow-table:begin --> \nold\n<!-- workflow-table:end -->\n\ntail stays\n' > "$TMP/doc4.md"
+cp "$TMP/doc4.md" "$TMP/doc4.orig"
+rc=0; WORKFLOWS_DIR="$TMP/wf2" DOCS_FILE="$TMP/doc4.md" bash "$SUBJECT" 2>/dev/null || rc=$?
+check "inexact BEGIN marker rejected" 1 "$rc"
+if diff -q "$TMP/doc4.orig" "$TMP/doc4.md" > /dev/null; then pass=$((pass+1)); echo "PASS: doc untouched on inexact BEGIN"; else fail=$((fail+1)); echo "FAIL: doc modified on inexact BEGIN"; fi
+
+# Case 8: extraction is scoped to the meta block — a decoy name:/description:
+# object ABOVE meta must not win (previously first-match-anywhere)
+mkdir -p "$TMP/wf3"
+cat > "$TMP/wf3/scoped.js" <<'EOF'
+const DECOY = {
+  name: 'decoy',
+  description: 'decoy description',
+}
+export const meta = {
+  name: 'scoped',
+  description: 'the real description',
+}
+return 1
+EOF
+cat > "$TMP/doc5.md" <<'EOF'
+<!-- workflow-table:begin -->
+<!-- workflow-table:end -->
+EOF
+rc=0; WORKFLOWS_DIR="$TMP/wf3" DOCS_FILE="$TMP/doc5.md" bash "$SUBJECT" || rc=$?
+check "meta-scoped run" 0 "$rc"
+grep -qF '| `scoped` | `/scoped` | the real description |' "$TMP/doc5.md" \
+  && { pass=$((pass+1)); echo "PASS: meta block wins over decoy"; } || { fail=$((fail+1)); echo "FAIL: decoy leaked into row"; }
+
 echo "---"; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

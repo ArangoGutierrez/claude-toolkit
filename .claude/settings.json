@@ -31,8 +31,6 @@
       "Bash(pnpm *)",
       "Bash(jq *)",
       "Bash(rg *)",
-      "Bash(* --version)",
-      "Bash(* --help)",
       "Read(*)",
       "WebSearch",
       "mcp__github__*"

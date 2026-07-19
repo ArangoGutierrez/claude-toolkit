@@ -45,8 +45,10 @@ while IFS= read -r f; do
     printf '%s\n' "$text" | grep -qEi "(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Za-z_]+(\.[A-Za-z_]+)+" && continue
     # ...or a bare ALL_CAPS_CONSTANT name (screaming-snake, no digits-only token would have '_')
     printf '%s\n' "$text" | grep -qE  "(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Z][A-Z0-9]*_[A-Z0-9_]*" && continue
-    # ...or an identifier-call value (a function invocation, not a literal credential)
-    printf '%s\n' "$text" | grep -qE  "[:=][\"' ]*_?[A-Za-z_][A-Za-z0-9_]*\(" && continue
+    # ...or an identifier-call value (a function invocation, not a literal credential);
+    # keyword-anchored like the siblings so a stray call elsewhere on the line
+    # cannot blind a real secret literal (critic-B2 finding)
+    printf '%s\n' "$text" | grep -qE  "(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Za-z_][A-Za-z0-9_]*\(" && continue
     is_suppressed "$f" "$ln" secrets && continue
     add 2 secrets "$f:$ln" "possible hardcoded secret"
   done < <(grep -nEi "(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Za-z0-9_/+.-]{16,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{12,}|BEGIN [A-Z ]*PRIVATE KEY" "$f" 2>/dev/null)

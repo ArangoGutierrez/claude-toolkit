@@ -25,6 +25,7 @@
 - [OpenRouter Free-Tier Backend](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/openrouter-free-tier.md): running the engine at $0 against OpenRouter's `:free` catalog
 - [Model ID Hygiene](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/model-id-hygiene.md): single- vs double-namespace catalog IDs and the sync gate
 - [Panel Config](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/panel-config.md): validate-recommendation panel config.yml walkthrough
+- [Workflow Library](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/workflow-library.md): reusable named workflow DAGs shipped in .claude/workflows/ — review-verify, chief-dispatch, weekly-audit
 
 ## Examples
 

@@ -75,6 +75,6 @@ const report = await agent(
   { label: 'synthesize', phase: 'Synthesize' },
 )
 
-const ok = sweeps.every((s) => s.ok) && issues.every((i) => i.severity === 'info')
+const ok = sweeps.length === AREAS.length && sweeps.every((s) => s.ok) && issues.every((i) => i.severity === 'info')
 log(`weekly-audit: ${sweeps.length}/4 sweeps completed, ${issues.length} issue(s), ok=${ok}`)
 return { ok, areas: sweeps.length, issues, report }

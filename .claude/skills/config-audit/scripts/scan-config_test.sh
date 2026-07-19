@@ -117,5 +117,41 @@ if echo "$OUTSN" | grep hook-hygiene | grep -q "lib.sh";      then echo "FAIL: m
 if echo "$OUTSN" | grep hook-hygiene | grep -q "plain.sh";    then echo "PASS: plain script still flagged";  PASS=$((PASS+1)); else echo "FAIL: plain hook-hygiene missed";      FAIL=$((FAIL+1)); fi
 if echo "$OUTSN" | grep secrets      | grep -q "prod.md";     then echo "PASS: real secret in non-test flagged"; PASS=$((PASS+1)); else echo "FAIL: real secret in non-test missed"; FAIL=$((FAIL+1)); fi
 
+# ---- fail-closed: mktemp failure must never exit 0 (issue #12) ----
+# Shim `mktemp` on PATH to always fail — deterministic across sandboxed and
+# unsandboxed environments. (TMPDIR=/nonexistent alone is not portable here:
+# BSD mktemp on macOS silently falls back to the OS default tmp dir when the
+# given TMPDIR doesn't exist, so unsandboxed it succeeds; only the agent
+# sandbox's write-allowlist turns that fallback into a real failure.)
+FAKEBIN="$TMP/fakebin"; mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/mktemp" <<'FAKEMKTEMP'
+#!/bin/bash
+echo "mktemp: mkstemp failed: Operation not permitted (test fixture)" >&2
+exit 1
+FAKEMKTEMP
+chmod +x "$FAKEBIN/mktemp"
+MKERR="$TMP/mkfail.err"
+PATH="$FAKEBIN:$PATH" bash "$SCAN" "$DIRTY" >/dev/null 2>"$MKERR"
+RCMK=$?
+if [ "$RCMK" -ne 0 ]; then echo "PASS: mktemp failure exits non-zero (rc=$RCMK)"; PASS=$((PASS+1)); else echo "FAIL: mktemp failure exited 0"; FAIL=$((FAIL+1)); fi
+# discriminate the SCRIPT's own diagnostic from the fake mktemp's stderr passthrough
+# (the shim always writes to stderr itself, so "stderr non-empty" alone would pass
+# even without a fix — assert scan-config's own "scan-config:"-prefixed line)
+if grep -q "^scan-config:" "$MKERR"; then echo "PASS: mktemp failure prints scan-config's own stderr diagnostic"; PASS=$((PASS+1)); else echo "FAIL: mktemp failure produced no scan-config diagnostic (only shim passthrough, if any): $(cat "$MKERR")"; FAIL=$((FAIL+1)); fi
+
+# ---- broad-perms: suffix-wildcard Bash grant must be flagged (issue #15b) ----
+# Fixture-only (not this repo's live settings.json) so this proves the DETECTOR,
+# independent of Task A's parallel cleanup of this repo's settings.json.
+SUFFIX="$TMP/suffix"; mkdir -p "$SUFFIX"
+printf '{ "permissions": { "allow": ["Bash(* --version)"] } }\n' > "$SUFFIX/settings.json"
+OUTSUF=$(bash "$SCAN" "$SUFFIX" 2>/dev/null)
+if echo "$OUTSUF" | grep "broad-perms" | grep -q "wildcard Bash permission grant"; then echo "PASS: suffix-wildcard Bash(* --version) flagged"; PASS=$((PASS+1)); else echo "FAIL: suffix-wildcard Bash grant missed: $OUTSUF"; FAIL=$((FAIL+1)); fi
+
+# ---- *.py coverage: secrets check must fire on .py once the glob is extended (issue #15a) ----
+PYFIX="$TMP/pyfix"; mkdir -p "$PYFIX/tool"
+printf 'api_key = "sk_live_abcd1234efgh5678ij"\n' > "$PYFIX/tool/creds.py"
+OUTPY=$(bash "$SCAN" "$PYFIX" 2>/dev/null)
+if echo "$OUTPY" | grep secrets | grep -q "creds.py"; then echo "PASS: .py file scanned for secrets"; PASS=$((PASS+1)); else echo "FAIL: .py file not scanned: $OUTPY"; FAIL=$((FAIL+1)); fi
+
 echo "==== Results: $PASS passed, $FAIL failed ===="
 [ "$FAIL" -eq 0 ]

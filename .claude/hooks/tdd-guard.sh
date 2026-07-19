@@ -110,6 +110,9 @@ case "$REL_PATH" in
     cmd/*/main.go)      exit 0 ;;
     # Database schema definitions (declarative, no logic to test)
     */schema/*.ts)      exit 0 ;;
+    # Workflow DAG scripts (declarative agent-orchestration graphs; gated by
+    # scripts/check-workflow-syntax.sh + a live E2E run, not unit TDD)
+    .claude/workflows/*.js|*/.claude/workflows/*.js) exit 0 ;;
     # Next.js error boundaries (framework convention files)
     */error.tsx)        exit 0 ;;
     # Next.js route entrypoint files (page.tsx, layout.tsx, loading.tsx, not-found.tsx)

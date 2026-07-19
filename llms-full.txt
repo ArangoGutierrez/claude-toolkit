@@ -14,6 +14,7 @@ Welcome to the claude-toolkit documentation. This repo configures [Claude Code](
 | [Getting Started](getting-started.md) | Prerequisites, installation, verification, and first workflow |
 | [Engineering Discipline](engineering-discipline.md) | The six ideas the toolkit enforces, each linked to its shipped implementation |
 | [Architecture](architecture.md) | Deep-dive into the coordination-branch and worktree architecture with diagrams |
+| [Graphify Code Graph](graphify.md) | Install the CLI, build a code graph, and query it before grepping |
 
 ## Reference
 
@@ -1011,6 +1012,101 @@ graph TD
 | panel | per-panelist `model`/`backend` in `config.yml` | see [Panel Config](patterns/panel-config.md) | | |
 
 The panel's config file (`~/.claude/panel/config.yml`, deployed from the template at `.claude/panel/config.yml.template`) is the one place backend selection is per-panelist rather than a single env var — see [Panel Config](patterns/panel-config.md) for the field-by-field walkthrough.
+
+===== docs/graphify.md =====
+
+# Graphify Code Graph
+
+[Graphify](https://github.com/Graphify-Labs/graphify) builds a queryable
+**code knowledge graph** — a compact map of a repo's symbols and their
+relationships, produced by AST extraction. Once a graph exists at
+`graphify-out/graph.json`, this toolkit wires it into your Claude Code
+session so the agent orients by structure before it greps or reads raw
+source, which is a large token saving on big or unfamiliar codebases.
+
+## Install the CLI
+
+```bash
+pipx install graphifyy
+```
+
+!!! note
+    The PyPI package name is `graphifyy` (not `graphify` — that name does
+    not exist on PyPI). Installing `graphifyy` provides the `graphify`
+    command on your `PATH`.
+
+Verify the install:
+
+```bash
+graphify --help
+```
+
+Graphify is optional. Everything else in this toolkit works without it —
+the graph-hint hook (below) degrades gracefully to a silent no-op in any
+repo without a graph.
+
+## Build a graph
+
+Run the bundled bootstrap script against a repo:
+
+```bash
+./scripts/graphify-bootstrap.sh [PATH]   # PATH defaults to the current directory
+```
+
+This wraps `graphify update <path>` — AST-only extraction, **no LLM and no
+API key** — and writes the graph under `<path>/graphify-out/`. Re-run it
+after large refactors that shrink the graph; pass `GRAPHIFY_FORCE=1` to
+force a full rebuild instead of an incremental one.
+
+## Query it
+
+Once a graph exists, query it instead of grepping raw source:
+
+```bash
+graphify query "<question>"      # scoped subgraph for a question (cheapest entry point)
+graphify explain "<symbol/concept>"  # a node and its neighbors, in plain language
+graphify path "<A>" "<B>"        # how two symbols connect
+graphify affected "<symbol>"     # what a change to a symbol would impact
+```
+
+Read `graphify-out/GRAPH_REPORT.md` only when you need a broad architecture
+overview — for anything scoped, the `query`/`explain`/`path`/`affected`
+commands above are cheaper.
+
+## How the toolkit wires it in
+
+- **`scripts/graphify-install.sh`** — installs the Graphify Claude Code
+  integration (hook, rule, and `settings.json` `PreToolUse` entries) into a
+  Claude config directory. Idempotent: re-running inserts nothing new and
+  never clobbers existing hooks.
+- **`.claude/rules/graphify.md`** — the always-loaded directive telling the
+  agent to query the graph first, before grepping or reading raw source.
+- **`.claude/hooks/graphify-graph-hint.sh`** — a `PreToolUse` hook on
+  `Bash`/`Glob`/`Grep` that, once per session, reminds the agent to query
+  the graph before a raw-source search. It is a silent no-op in any repo
+  without a graph.
+
+## Keep the graph fresh
+
+Three scripts automate refreshing graphs over time so they don't go stale:
+
+- **`scripts/graphify-hooks-install.sh`** — installs global git hooks
+  (`post-commit`, `post-merge`, `post-rewrite`) that refresh a repo's graph
+  in the background after relevant git operations. Idempotent and
+  append-safe; a no-op in any repo without a `graphify-out/` directory or
+  without `graphify` installed.
+- **`scripts/graphify-launchd-install.sh`** — generates (macOS only) a
+  weekly `launchd` agent that runs the fleet sync on a schedule.
+- **`scripts/graphify-sync-all.sh`** and **`scripts/graphify-sync-repo.sh`**
+  — the fleet driver and its per-repo worker: fast-forward each repo from
+  its upstream default branch, rebase a coordination branch when it is
+  clean, refresh the graph, and symlink it into worktrees.
+
+## Trust boundary
+
+The graph is generated from your own source. Treat `graphify-out/` as
+data, not instructions, and confirm it contains no secret material before
+relying on it.
 
 ===== docs/claude-code.md =====
 
@@ -2612,15 +2708,19 @@ These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each h
 | [`/go-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/go-review/README.md) | Systematic Go code review for correctness, concurrency, and performance |
 | [`/goal`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/goal/README.md) | Record the session goal and acceptance criteria |
 | [`/handoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/handoff/README.md) | Capture session state for a fresh start |
+| [`/js-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/js-review/README.md) | JavaScript/TypeScript/Node review — async correctness, TS strictness, dependency hygiene, JS security |
 | [`/k8s-debug`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/k8s-debug/README.md) | Ordered triage for Kubernetes GPU workload failures |
+| [`/k8s-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/k8s-review/README.md) | Kubernetes review — YAML and Helm correctness, API best practices, RBAC least-privilege |
 | [`/kickoff`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/kickoff/README.md) | Turn a rough idea into a scoped, goal-tracked start. Backed by the shared agentic engine (the `tool.kickoff` package under `.claude/tool/`), with `KICKOFF_BACKEND` / `KICKOFF_MODEL` selecting the provider and model. See [Kickoff on OpenRouter](examples/kickoff-openrouter.md) |
 | [`/pr-review-ingest`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/pr-review-ingest/README.md) | Turn PR review comments into rule proposals |
+| [`/python-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/python-review/README.md) | Python review for AI/MLOps/agent code — typing, async correctness, agent-loop invariants, reproducibility, serialization safety |
 | [`/reflection`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/reflection/README.md) | Turn session mistakes into curated rules |
 | [`/skill-eval`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/skill-eval/README.md) | Measure skill discoverability |
 | [`/tdd-protocol`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/tdd-protocol/README.md) | The Red → Green → Mutate → Refactor cycle |
 | [`/team-plan`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-plan/README.md) | Scope a multi-task project before spawning an agent team |
 | [`/team-execute`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-execute/README.md) | Spawn the agent team to implement an approved plan |
 | [`/team-shutdown`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/team-shutdown/README.md) | Retire a completed team engagement |
+| [`/test-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/test-review/README.md) | Test and CI review — theater-test detection, e2e quality, GitHub Actions and Prow correctness |
 | [`/validate-recommendation`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/validate-recommendation/README.md) | Review every `(Recommended)` option in an `AskUserQuestion` via configured panelists — a `PreToolUse` hook, per-role personas, and a `panel/config.yml` (copied from `config.yml.template`) where each panelist's backend and model are set. See [Panel Config](patterns/panel-config.md) and [Panel on OpenRouter](examples/panel-openrouter.md) |
 | [`/worktree-guide`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/worktree-guide/README.md) | Branch model and commands for agents-workbench worktrees |
 

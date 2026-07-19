@@ -9,6 +9,7 @@ Welcome to the claude-toolkit documentation. This repo configures [Claude Code](
 | [Getting Started](getting-started.md) | Prerequisites, installation, verification, and first workflow |
 | [Engineering Discipline](engineering-discipline.md) | The six ideas the toolkit enforces, each linked to its shipped implementation |
 | [Architecture](architecture.md) | Deep-dive into the coordination-branch and worktree architecture with diagrams |
+| [Graphify Code Graph](graphify.md) | Install the CLI, build a code graph, and query it before grepping |
 
 ## Reference
 

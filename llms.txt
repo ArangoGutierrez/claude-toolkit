@@ -11,6 +11,7 @@
 - [Getting Started](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/getting-started.md): prerequisites, installation, first workflow
 - [Engineering Discipline](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/engineering-discipline.md): the six enforced ideas and their implementations
 - [Architecture](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/architecture.md): coordination-branch/worktree architecture, plus the agentic engine
+- [Graphify Code Graph](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/graphify.md): install the graphifyy CLI, build a repo graph, query it before grepping
 - [Claude Code Configuration](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/claude-code.md): hooks, settings, plugins, policies
 - [Cursor Configuration](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/cursor.md): agents, commands, rules, hooks
 - [Deployment Scripts](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/deployment.md): deploy.sh, capture.sh, diff.sh

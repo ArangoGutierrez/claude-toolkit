@@ -35,6 +35,7 @@ nav:
   - Engineering Discipline: engineering-discipline.md
   - Architecture: architecture.md
   - Agents: agents.md
+  - Graphify: graphify.md
   - Patterns:
       - OpenRouter Free-Tier Backend: patterns/openrouter-free-tier.md
       - Model ID Hygiene: patterns/model-id-hygiene.md

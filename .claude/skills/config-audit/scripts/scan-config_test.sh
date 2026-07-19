@@ -161,5 +161,21 @@ printf 'api_key=_resolve_api_key(),\n' > "$PYCALL/tool/eval.py"
 OUTPYCALL=$(bash "$SCAN" "$PYCALL" 2>/dev/null)
 if echo "$OUTPYCALL" | grep secrets | grep -q "eval.py"; then echo "FAIL: identifier-call value flagged as secret: $OUTPYCALL"; FAIL=$((FAIL+1)); else echo "PASS: identifier-call value not flagged as secret"; PASS=$((PASS+1)); fi
 
+# ---- anchoring: a leading call must NOT blind a real secret on the same line (critic-B2 finding) ----
+# An unanchored identifier-call exclusion turns `x=f()` into a whole-line suppression;
+# the real api_key literal that follows must still be flagged.
+COMPOUND="$TMP/compound"; mkdir -p "$COMPOUND/tool"
+printf 'x=f(); api_key="abcdefghijklmnop1234567890"\n' > "$COMPOUND/tool/mixed.py"
+OUTCOMP=$(bash "$SCAN" "$COMPOUND" 2>/dev/null)
+if echo "$OUTCOMP" | grep secrets | grep -q "mixed.py"; then echo "PASS: leading call does not blind a same-line secret"; PASS=$((PASS+1)); else echo "FAIL: leading call blinded a same-line secret: $OUTCOMP"; FAIL=$((FAIL+1)); fi
+
+# ---- breadth guard: a call AFTER a real secret must not suppress it (critic-B2 minor) ----
+# Guards the exclusion's [:=] anchor: broadening it to "any call anywhere on the line"
+# would blind this shape; the secret literal must keep flagging.
+TRAIL="$TMP/trailcall"; mkdir -p "$TRAIL/tool"
+printf 'password="hunter2longvalue1234567890"; helper(x)\n' > "$TRAIL/tool/trail.py"
+OUTTRAIL=$(bash "$SCAN" "$TRAIL" 2>/dev/null)
+if echo "$OUTTRAIL" | grep secrets | grep -q "trail.py"; then echo "PASS: trailing call does not suppress a preceding secret"; PASS=$((PASS+1)); else echo "FAIL: trailing call suppressed a preceding secret: $OUTTRAIL"; FAIL=$((FAIL+1)); fi
+
 echo "==== Results: $PASS passed, $FAIL failed ===="
 [ "$FAIL" -eq 0 ]

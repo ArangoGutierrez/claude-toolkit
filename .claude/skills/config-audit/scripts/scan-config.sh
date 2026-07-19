@@ -8,7 +8,8 @@
 set -uo pipefail
 
 DIR="${1:-$HOME/.claude}"
-[ -d "$DIR" ] || { echo "scan-config: no such dir: $DIR" >&2; exit 0; }
+# fail closed: a non-existent target scanned nothing -- never report "clean".
+[ -d "$DIR" ] || { echo "scan-config: no such dir: $DIR (nothing scanned)" >&2; exit 3; }
 
 FINDINGS="$(mktemp)"
 mk_rc=$?
@@ -17,8 +18,19 @@ if [ "$mk_rc" -ne 0 ] || [ -z "$FINDINGS" ] || [ ! -f "$FINDINGS" ]; then
   exit 3
 fi
 trap 'rm -f "$FINDINGS"' EXIT
-add() { printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >> "$FINDINGS"; }
+# fail closed: a lost finding (append failure) must never let the scan report
+# "clean" -- abort with the documented code 3 rather than silently drop it.
+add() {
+  printf '%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" >> "$FINDINGS" || {
+    echo "scan-config: failed to append finding to buffer; failing closed" >&2
+    exit 3
+  }
+}
 is_suppressed() { sed -n "${2}p" "$1" 2>/dev/null | grep -qE "config-audit:ignore[[:space:]]+(all|$3)"; }
+
+# Shared secret signature: keyword=value (>=16 chars) or a well-known token/key
+# form. Defined once so the residue re-test below uses the identical pattern.
+SECRET_RE="(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Za-z0-9_/+.-]{16,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{12,}|BEGIN [A-Z ]*PRIVATE KEY"
 
 # find_config DIR PRED... — list files under DIR matching find predicate PRED,
 # pruning noise trees (huge, machine-managed, or archived) that are not live config.
@@ -36,22 +48,29 @@ find_config() {
 while IFS= read -r f; do
   [ -f "$f" ] || continue
 
-  # secrets (sev 2)
+  # secrets (sev 2) -- value-scoped suppression (issue #20 defect c):
+  # strip each benign keyword=value occurrence, then re-test the remainder with
+  # $SECRET_RE. A benign match no longer `continue`s the whole line, so a real
+  # secret literal sharing the line with a benign value is still flagged.
   while IFS=: read -r ln text; do
     [ -n "${ln:-}" ] || continue
     case "$f" in *_test.sh) continue;; esac   # test files hold deliberate fixtures, not real secrets
     case "$text" in *'<'*'>'*|*example*|*EXAMPLE*|*REDACTED*|*xxxx*|*placeholder*|*your_*) continue;; esac
-    # example-code, not a credential: value is a dotted method/property chain (a.b.c)
-    printf '%s\n' "$text" | grep -qEi "(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Za-z_]+(\.[A-Za-z_]+)+" && continue
-    # ...or a bare ALL_CAPS_CONSTANT name (screaming-snake, no digits-only token would have '_')
-    printf '%s\n' "$text" | grep -qE  "(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Z][A-Z0-9]*_[A-Z0-9_]*" && continue
-    # ...or an identifier-call value (a function invocation, not a literal credential);
-    # keyword-anchored like the siblings so a stray call elsewhere on the line
-    # cannot blind a real secret literal (critic-B2 finding)
-    printf '%s\n' "$text" | grep -qE  "(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Za-z_][A-Za-z0-9_]*\(" && continue
+    # Remove keyword-anchored benign values, then re-scan the residue:
+    #   1. dotted method/property chain (a.b.c) -- keyword case-insensitive to
+    #      mirror the case-insensitive outer scan (bracket classes for BSD sed).
+    #   2. bare ALL_CAPS_CONSTANT name (screaming-snake).
+    #   3. identifier-call value (a function invocation, not a literal credential).
+    # Each is keyword-anchored so a stray benign token elsewhere on the line
+    # cannot remove an unrelated secret (critic-B2 anchoring).
+    residue=$(printf '%s\n' "$text" \
+      | sed -E "s/([Aa][Pp][Ii][_-]?[Kk][Ee][Yy]|[Ss][Ee][Cc][Rr][Ee][Tt]|[Tt][Oo][Kk][Ee][Nn]|[Pp][Aa][Ss][Ss][Ww][Oo][Rr][Dd]|[Bb][Ee][Aa][Rr][Ee][Rr])[\"' ]*[:=][\"' ]*[A-Za-z_]+(\.[A-Za-z_]+)+//g" \
+      | sed -E "s/(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Z][A-Z0-9]*_[A-Z0-9_]*//g" \
+      | sed -E "s/(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Za-z_][A-Za-z0-9_]*\(//g")
+    printf '%s\n' "$residue" | grep -qEi "$SECRET_RE" || continue
     is_suppressed "$f" "$ln" secrets && continue
     add 2 secrets "$f:$ln" "possible hardcoded secret"
-  done < <(grep -nEi "(api[_-]?key|secret|token|password|bearer)[\"' ]*[:=][\"' ]*[A-Za-z0-9_/+.-]{16,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{12,}|BEGIN [A-Z ]*PRIVATE KEY" "$f" 2>/dev/null)
+  done < <(grep -nEi "$SECRET_RE" "$f" 2>/dev/null)
 
   # injection-sink (sev 2)
   while IFS=: read -r ln text; do

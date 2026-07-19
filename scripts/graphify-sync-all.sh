@@ -30,14 +30,17 @@ while IFS= read -r gd; do
   rm -f "$errf"
   printf '%s\n' "$line" >> "$LATEST.tmp"
   count=$((count+1))
-  case "$line" in *rebase:CONFLICT*) printf -- '- %s\n' "$repo" >> "$LATEST.conflicts"; conflict_count=$((conflict_count+1));; esac
+  # A stashed WIP (CLEAN:WIP-STASHED) is as much a manual-attention item as a
+  # CONFLICT: the rebase went through, but a stash entry now sits parked on
+  # the repo and will be forgotten if nobody is told about it.
+  case "$line" in *rebase:CONFLICT*|*rebase:CLEAN:WIP-STASHED*) printf -- '- %s\n' "$repo" >> "$LATEST.conflicts"; conflict_count=$((conflict_count+1));; esac
 done < <(find "$ROOT" -type d -name graphify-out -prune 2>/dev/null)
 
 {
   echo "# Graphify fleet sync — $TS"
   echo
   if [ "$conflict_count" -gt 0 ]; then
-    echo "## Conflicts (manual rebase needed)"; cat "$LATEST.conflicts"; echo
+    echo "## Manual attention needed"; cat "$LATEST.conflicts"; echo
   fi
   echo "## Per-repo ($count)"
   echo '```'; cat "$LATEST.tmp"; echo '```'
@@ -45,6 +48,6 @@ done < <(find "$ROOT" -type d -name graphify-out -prune 2>/dev/null)
 rm -f "$LATEST.tmp" "$LATEST.conflicts"
 
 if [ "$conflict_count" -gt 0 ] && command -v osascript >/dev/null 2>&1; then
-  osascript -e "display notification \"$conflict_count repo(s) need manual rebase\" with title \"graphify-sync\"" >/dev/null 2>&1 || true
+  osascript -e "display notification \"$conflict_count repo(s) need manual attention\" with title \"graphify-sync\"" >/dev/null 2>&1 || true
 fi
 echo "synced $count repo(s); $conflict_count conflict(s). log: $LOG"

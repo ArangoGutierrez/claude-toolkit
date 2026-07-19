@@ -1,0 +1,20 @@
+name: llms-full.txt Drift Gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  drift-gate:
+    name: llms-full.txt drift gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Regenerate llms-full.txt
+        run: bash scripts/gen-llms-full.sh
+
+      - name: Fail if llms-full.txt drifted from what ships
+        run: git diff --exit-code llms-full.txt

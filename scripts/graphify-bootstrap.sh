@@ -20,8 +20,8 @@ Build or refresh a Graphify code graph for the repo at PATH (default: .).
 Runs `graphify update PATH` (AST-only, no LLM).
 
 Requires graphify on PATH:
-  pipx install graphify     # recommended
-  # or: pip install graphify
+  pipx install graphifyy    # recommended (PyPI package is graphifyy; installs the 'graphify' command)
+  # or: pip install graphifyy
 EOF
 }
 
@@ -34,7 +34,7 @@ main() {
 
   if ! command -v graphify >/dev/null 2>&1; then
     echo "graphify-bootstrap: 'graphify' not found on PATH." >&2
-    echo "  Install it first:  pipx install graphify" >&2
+    echo "  Install it first:  pipx install graphifyy" >&2
     exit 1
   fi
 

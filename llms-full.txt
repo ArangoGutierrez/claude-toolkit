@@ -1279,7 +1279,7 @@ Claude Code's permission system uses three lists: `allow` (no prompt), `deny` (a
 | Kubernetes toolchain | `Bash(kubectl *)`, `Bash(kind *)`, `Bash(helm *)`, `Bash(kustomize *)`, `Bash(controller-gen *)`, `Bash(setup-envtest *)` |
 | Security scanners | `Bash(govulncheck *)`, `Bash(gosec *)`, `Bash(trivy *)`, `Bash(grype *)` |
 | Code quality | `Bash(golangci-lint *)` |
-| Utilities | `Bash(jq *)`, `Bash(rg *)`, `Bash(* --version)`, `Bash(* --help)` |
+| Utilities | `Bash(jq *)`, `Bash(rg *)` |
 | File operations | `Read(*)`, `Write(*)`, `Edit(*)` |
 | Web | `WebFetch(*)`, `WebSearch` |
 | GitHub MCP | `mcp__github__*` |
@@ -1296,6 +1296,25 @@ Secrets and credentials are blocked from both reading and writing:
 - `Bash(rm *)`, `Bash(rm -rf *)`
 - `Bash(git rebase *)`, `Bash(git reset --hard *)`, `Bash(git push --force *)`
 - `Bash(sudo *)`
+
+### Suffix-wildcard Bash allows
+
+A suffix-wildcard allow pattern like `Bash(* --version)` matches on the
+trailing text of a command line, not its leading command, so it approves
+*any* string that happens to end with that flag:
+
+```
+Bash(* --help)  matches:  bash -c '<payload>' --help
+```
+
+That auto-approves an attacker-controlled payload disguised as a flag.
+`settings.json` used to carry `Bash(* --version)` and `Bash(* --help)` as
+blanket allows; both were removed with no replacement, because every tool
+listed in the table above already has its own `Bash(<tool> *)` rule, which
+covers that tool's `--version`/`--help` invocations without the bypass. If
+a new tool needs unprompted version/help checks, add a scoped
+`Bash(<tool> *)` rule rather than a suffix wildcard. The `config-audit`
+skill scans for this pattern class and flags it during a config audit.
 
 ### Hooks configuration
 

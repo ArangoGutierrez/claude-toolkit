@@ -133,7 +133,7 @@ chmod +x "$FAKEBIN/mktemp"
 MKERR="$TMP/mkfail.err"
 PATH="$FAKEBIN:$PATH" bash "$SCAN" "$DIRTY" >/dev/null 2>"$MKERR"
 RCMK=$?
-if [ "$RCMK" -ne 0 ]; then echo "PASS: mktemp failure exits non-zero (rc=$RCMK)"; PASS=$((PASS+1)); else echo "FAIL: mktemp failure exited 0"; FAIL=$((FAIL+1)); fi
+if [ "$RCMK" -eq 3 ]; then echo "PASS: mktemp failure exits with documented abort code 3 (rc=$RCMK)"; PASS=$((PASS+1)); else echo "FAIL: mktemp failure did not exit 3, got rc=$RCMK"; FAIL=$((FAIL+1)); fi
 # discriminate the SCRIPT's own diagnostic from the fake mktemp's stderr passthrough
 # (the shim always writes to stderr itself, so "stderr non-empty" alone would pass
 # even without a fix — assert scan-config's own "scan-config:"-prefixed line)
@@ -152,6 +152,14 @@ PYFIX="$TMP/pyfix"; mkdir -p "$PYFIX/tool"
 printf 'api_key = "sk_live_abcd1234efgh5678ij"\n' > "$PYFIX/tool/creds.py"
 OUTPY=$(bash "$SCAN" "$PYFIX" 2>/dev/null)
 if echo "$OUTPY" | grep secrets | grep -q "creds.py"; then echo "PASS: .py file scanned for secrets"; PASS=$((PASS+1)); else echo "FAIL: .py file not scanned: $OUTPY"; FAIL=$((FAIL+1)); fi
+
+# ---- identifier-call value must NOT be flagged as a secret (fable wave-review finding B1) ----
+# api_key=_resolve_api_key(), is a function call, not a credential; reproduces the
+# false positive the merged-tree self-scan hit on .claude/skills/done/eval.py:66.
+PYCALL="$TMP/pycall"; mkdir -p "$PYCALL/tool"
+printf 'api_key=_resolve_api_key(),\n' > "$PYCALL/tool/eval.py"
+OUTPYCALL=$(bash "$SCAN" "$PYCALL" 2>/dev/null)
+if echo "$OUTPYCALL" | grep secrets | grep -q "eval.py"; then echo "FAIL: identifier-call value flagged as secret: $OUTPYCALL"; FAIL=$((FAIL+1)); else echo "PASS: identifier-call value not flagged as secret"; PASS=$((PASS+1)); fi
 
 echo "==== Results: $PASS passed, $FAIL failed ===="
 [ "$FAIL" -eq 0 ]

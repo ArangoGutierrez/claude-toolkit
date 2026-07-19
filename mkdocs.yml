@@ -34,12 +34,14 @@ nav:
   - Getting Started: getting-started.md
   - Engineering Discipline: engineering-discipline.md
   - Architecture: architecture.md
+  - "Orchestration: Loops → Graphs": orchestration.md
   - Agents: agents.md
   - Graphify: graphify.md
   - Patterns:
       - OpenRouter Free-Tier Backend: patterns/openrouter-free-tier.md
       - Model ID Hygiene: patterns/model-id-hygiene.md
       - Panel Config: patterns/panel-config.md
+      - Workflow Library: patterns/workflow-library.md
   - Examples:
       - Kickoff on OpenRouter: examples/kickoff-openrouter.md
       - Panel on OpenRouter: examples/panel-openrouter.md

@@ -1,0 +1,32 @@
+name: Workflow Library Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege: the gates only read the tree.
+permissions:
+  contents: read
+
+jobs:
+  gates:
+    name: Workflow library gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Parse-check workflow scripts
+        run: bash scripts/check-workflow-syntax.sh
+
+      - name: Syntax-check harness
+        run: bash scripts/check-workflow-syntax_test.sh
+
+      - name: Docs-generator harness
+        run: bash scripts/gen-workflow-docs_test.sh
+
+      - name: Regenerate the workflow table
+        run: bash scripts/gen-workflow-docs.sh
+
+      - name: Fail if the docs drifted from what ships
+        run: git diff --exit-code docs/patterns/workflow-library.md

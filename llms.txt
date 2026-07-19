@@ -19,12 +19,14 @@
 - [Skill README Template](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/skill-readme-template.md): SKILL.md vs README.md standard
 - [Testing Agent Models](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/testing-agent-models.md): verifying Cursor agent model settings
 - [Agents](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/agents.md): how an agent should traverse this repo's docs
+- [Orchestration: Loops → Graphs](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/orchestration.md): the prompts → loops → graphs maturity model, mapped to toolkit components
 
 ## Patterns
 
 - [OpenRouter Free-Tier Backend](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/openrouter-free-tier.md): running the engine at $0 against OpenRouter's `:free` catalog
 - [Model ID Hygiene](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/model-id-hygiene.md): single- vs double-namespace catalog IDs and the sync gate
 - [Panel Config](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/panel-config.md): validate-recommendation panel config.yml walkthrough
+- [Workflow Library](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/patterns/workflow-library.md): reusable named workflow DAGs shipped in .claude/workflows/ — review-verify, chief-dispatch, weekly-audit
 
 ## Examples
 

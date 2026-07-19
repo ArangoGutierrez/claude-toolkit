@@ -3160,6 +3160,105 @@ always answers "what variables does this read." This structure is a
 contract: new pattern pages are expected to follow it, and a page that
 doesn't should be treated as a bug.
 
+===== docs/orchestration.md =====
+
+# Orchestration: Loops → Graphs
+
+> "Here's your monthly reminder that you shouldn't be prompting coding
+> agents anymore. You should be designing loops that prompt your agents."
+> — [Peter Steinberger, June 2026](https://x.com/steipete/status/2063697162748260627)
+>
+> "Are we still talking loops or did we shift to graphs yet?"
+> — [Peter Steinberger, July 2026](https://x.com/steipete/status/2078277297791189132)
+
+Agent orchestration has a maturity model. Each stage changes what *you*
+produce: prompts produce answers, loops produce automation, graphs produce
+verified systems of agents. This page names the stages, tells you when each
+one is enough, and maps them to the pieces this toolkit ships.
+
+## The three stages
+
+**Stage 1 — Prompts.** You type, the agent acts, you read, you type again.
+You are the control flow. Perfectly fine for exploration, one-off fixes,
+and anything you'd finish before automation could pay for itself.
+
+**Stage 2 — Loops.** The insight of loop engineering: stop being the
+control flow. A loop re-invokes the agent on a schedule or a trigger —
+"check CI and fix what broke", "keep the dependency PRs merged", "refresh
+the code graph weekly". The agent gets re-prompted by a *program*, not by
+you. Loops excel at recurring maintenance with a stable prompt. Their limit:
+a loop is one agent thinking alone — no fan-out, no independent
+verification, no structured hand-offs.
+
+**Stage 3 — Graphs.** Work becomes a DAG of agents: fan-out over independent
+subtasks, barriers where synthesis genuinely needs everything, adversarial
+verification as a first-class node between "found" and "reported",
+checkpointed state so a killed run resumes instead of restarting. The
+orchestration is deterministic code; the agents supply judgment inside
+well-defined boxes. This is where "one agent with a long prompt" becomes
+"a system with structural quality guarantees".
+
+There is a fourth axis the loops-vs-graphs debate tends to miss: **knowledge
+graphs**. Orchestration graphs coordinate *work*; knowledge graphs give
+agents a cheap, queryable map of *the territory* (code structure, prior
+decisions) so every node starts oriented instead of grepping from zero.
+
+## When each stage is enough
+
+| You are doing… | Stay at |
+|---|---|
+| Exploring, spiking, one-off edits | Prompts |
+| Recurring maintenance, a stable prompt, one agent suffices | Loops |
+| Review/audit where findings must be verified, migrations over many files, work needing independent perspectives | Graphs |
+
+Do not cargo-cult upward. A loop that works beats a graph that impresses;
+every stage you climb adds cost, latency, and moving parts. Climb when the
+*shape* of the work demands it — verification, fan-out, or scale one
+context window can't hold — not when a tweet does.
+
+## What this toolkit ships per stage
+
+| Stage | Component | What it does |
+|---|---|---|
+| Loops | `/loop` (Cursor command) | re-run a task until its completion phrase appears, bounded by `--max` iterations |
+| Loops | scheduled tasks (cron/launchd) | headless recurring runs, e.g. weekly graph refresh |
+| Graphs | [Workflow Library](patterns/workflow-library.md) | named, reusable orchestration DAGs (`/review-verify`, `/chief-dispatch`, `/weekly-audit`) |
+| Graphs | [kickoff enrichment](architecture.md) | compiles a rough goal into a scoped prompt, acceptance checks, and a dispatch plan |
+| Knowledge graphs | [Graphify](graphify.md) | AST-derived code graph agents query before grepping |
+
+## Composing the layers
+
+The stages compose — that's the point. A **loop** can launch a **graph**:
+
+```text
+# weekly, headless: the loop is the scheduler, the graph does the work
+claude -p "/weekly-audit"
+```
+
+Schedule that line with cron or launchd and you have recurring,
+parallel, adversarially-synthesized repo hygiene — a loop prompting a
+graph of agents, none of it prompted by you.
+
+## Cost and safety rails
+
+Graphs multiply agents, so the toolkit treats orchestration spend as
+opt-in, never inferred:
+
+- Multi-agent workflows run only on explicit user opt-in (a typed
+  `/<workflow>` command is exactly that).
+- Verification is structural: `review-verify` refuses to report a finding
+  no refuter attacked; `chief-dispatch` refuses to accept an implementer's
+  report as evidence.
+- Workflows never push, post, or merge — external writes stay with the
+  human operator.
+
+## Further reading
+
+- [Claude Code workflows documentation](https://code.claude.com/docs/en/workflows)
+- [Workflow Library reference](patterns/workflow-library.md)
+- [Engineering Discipline](engineering-discipline.md) — the verification
+  culture the graphs encode
+
 ===== docs/patterns/openrouter-free-tier.md =====
 
 # Pattern: OpenRouter Free-Tier Backend
@@ -3367,6 +3466,120 @@ in-process as a spawned agent.
   [OpenRouter Free-Tier Backend](openrouter-free-tier.md) applies: free
   routes may log prompts for provider training. Use a paid route or a
   self-hosted endpoint for panelists reviewing sensitive design decisions.
+
+===== docs/patterns/workflow-library.md =====
+
+# Workflow Library
+
+Reusable, named agent-orchestration graphs shipped in
+[`.claude/workflows/`](https://github.com/ArangoGutierrez/claude-toolkit/tree/main/.claude/workflows).
+Each one is a deterministic DAG — fan-out, verification gates, and synthesis
+encoded as a script, not as prompting habits. For the *why*, read
+[Orchestration: Loops → Graphs](../orchestration.md).
+
+## Requirements
+
+- Claude Code **v2.1.154 or later** (dynamic workflows).
+- Any paid plan; on **Pro**, enable the "Dynamic workflows" row in `/config`.
+- Workflows in a project's `.claude/workflows/` are discovered automatically
+  when the repo is cloned; copies in `~/.claude/workflows/` are available in
+  every project (this repo's `deploy.sh` mirrors them there).
+- Invocation: each workflow registers as a slash command named after its
+  `meta.name` — type `/<name>` and describe inputs in natural language;
+  Claude passes them to the script as structured `args`.
+
+Source: [Claude Code workflows documentation](https://code.claude.com/docs/en/workflows).
+
+## Shipped workflows
+
+<!-- workflow-table:begin -->
+| Workflow | Invoke | Purpose |
+|---|---|---|
+| `chief-dispatch` | `/chief-dispatch` | Run task briefs through builder agents with an adversarial critic gate and one bounded fix round |
+| `review-verify` | `/review-verify` | Review a diff or path across dimensions, then adversarially verify every finding |
+| `weekly-audit` | `/weekly-audit` | Parallel repo hygiene sweep — config audit, eval suite, docs drift, dead references — synthesized into one report |
+<!-- workflow-table:end -->
+
+The table above is generated by `scripts/gen-workflow-docs.sh` from each
+workflow's `meta` block — the docs cannot drift from what ships.
+
+## review-verify
+
+The canonical find → verify graph: one finder agent per review dimension,
+then one adversarial refuter per finding. A finding only reaches you after
+surviving an agent whose sole job was to kill it.
+
+```text
+/review-verify                          # review the working diff, default dimensions
+/review-verify the diff of feat-x vs main, dimensions: concurrency, error handling
+```
+
+- **Args:** `target` (what to review — diff spec, path, PR ref; default:
+  working diff), `dimensions` (list; default: correctness, security,
+  test quality).
+- **Shape:** `pipeline(dimensions)` — verification of dimension A's findings
+  starts while dimension B is still reviewing; no wasted wall-clock.
+- **Cost:** `dimensions + findings` agents (default run with a clean-ish
+  diff: 3–8 agents).
+
+## chief-dispatch
+
+The orchestrator pattern as a graph: a builder executes a fully-specified
+brief, an adversarial critic verifies the work against the brief —
+treating the builder's report as unverified claims — and a single bounded
+fix round handles rejections. With more than one task, each builder gets an
+isolated git worktree; the critic and fixer operate on the builder's
+reported working directory and branch.
+
+```text
+/chief-dispatch the brief at docs/briefs/task-1.md
+/chief-dispatch tasks: brief docs/briefs/task-1.md and brief docs/briefs/task-2.md
+```
+
+- **Args:** `tasks: [{brief}]` (file path or inline text) — or a single
+  `brief`.
+- **Returns:** per-task `DONE | DONE_WITH_CONCERNS | BLOCKED` with the
+  branch each task's work sits on. **It never merges or pushes** — the
+  operator reviews the returned branches and merges deliberately.
+- **Cost:** 2–4 agents per task (builder, critic, optional fixer + re-gate).
+
+## weekly-audit
+
+A four-way parallel hygiene sweep — config audit, eval suite, docs drift,
+dead references — synthesized into one prioritized report. The barrier
+before synthesis is deliberate: the report needs all four sweeps.
+
+```text
+/weekly-audit
+```
+
+Runs headless-friendly: schedule it (cron, launchd, or Claude Code's
+background tasks) to make a *loop launch a graph* — see the
+[composition section](../orchestration.md#composing-the-layers) of the
+orchestration guide. Note: MCP servers needing interactive auth may be
+absent in headless runs; the auditors only use local tools.
+
+- **Args:** none.
+- **Cost:** 5 agents (4 sweeps + synthesis).
+
+## Customizing
+
+- **Models:** workflows inherit the session model. Pin a stage only when
+  you are sure a cheaper tier fits (e.g. `effort: 'low'` for mechanical
+  sweeps); when unsure, inherit.
+- **Agent types:** stages accept `agentType` (e.g. a repo-specific
+  `principal-engineer`) — the shipped defaults avoid it so the library
+  works in any clone.
+- **Budgets:** append a token target ("+300k") to scale depth; scripts can
+  read it via the `budget` global.
+
+## Writing your own
+
+Start from a completed ad-hoc run: `/workflows` → select the run → press
+`s` to save it (Tab toggles project vs personal scope). Keep `meta.name`,
+`meta.description`, and `meta.whenToUse` single-line and single-quoted —
+`scripts/gen-workflow-docs.sh` extracts them, and
+`scripts/check-workflow-syntax.sh` gates the syntax in CI and locally.
 
 ===== docs/examples/kickoff-openrouter.md =====
 

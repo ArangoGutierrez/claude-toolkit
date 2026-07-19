@@ -34,6 +34,7 @@ nav:
   - Getting Started: getting-started.md
   - Engineering Discipline: engineering-discipline.md
   - Architecture: architecture.md
+  - "Orchestration: Loops → Graphs": orchestration.md
   - Agents: agents.md
   - Graphify: graphify.md
   - Patterns:

@@ -19,6 +19,7 @@
 - [Skill README Template](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/skill-readme-template.md): SKILL.md vs README.md standard
 - [Testing Agent Models](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/testing-agent-models.md): verifying Cursor agent model settings
 - [Agents](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/agents.md): how an agent should traverse this repo's docs
+- [Orchestration: Loops → Graphs](https://raw.githubusercontent.com/ArangoGutierrez/claude-toolkit/main/docs/orchestration.md): the prompts → loops → graphs maturity model, mapped to toolkit components
 
 ## Patterns
 

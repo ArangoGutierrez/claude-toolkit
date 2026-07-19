@@ -42,4 +42,40 @@ grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' "$LOGDIR/graphify-sync.log" && pass "log
 n=$(grep -c '| upstream:' "$LOGDIR/graphify-sync.log" 2>/dev/null || echo 0)
 [ "$n" -ge 2 ] && pass "both real repos processed (loop continues past skip)" || fail "only $n processed"
 
+# 6) manual-attention collection: a fork ending rebase:CLEAN:WIP-STASHED must be
+#    collected; a fork ending plain rebase:CLEAN must NOT be (regression against a
+#    naive `*rebase:CLEAN*` pattern, which would swallow both).
+NOHOOKS="$tmproot/nohooks"; mkdir -p "$NOHOOKS"
+mk_aw_fork(){ # $1 = ROOT-relative path (e.g. e/wip)  $2 = scenario: stashed|clean
+  local rel="$1" scenario="$2" d up upwork
+  d="$ROOT/$rel"; up="$tmproot/${rel//\//-}-up"; mkdir -p "$(dirname "$d")"
+  git init -q --bare "$up"
+  git init -q "$d"; git -C "$d" config --local core.hooksPath "$NOHOOKS"
+  ( cd "$d"
+    echo base > a.txt; gci add a.txt; gci commit -qm base
+    git branch -m master; git remote add upstream "$up"; gci push -q upstream master
+    git -C "$up" symbolic-ref HEAD refs/heads/master
+    gci checkout -q -b agents-workbench
+    mkdir -p graphify-out; echo '{}' > graphify-out/graph.json )
+  upwork="$tmproot/${rel//\//-}-upwork"; git clone -q "$up" "$upwork"
+  if [ "$scenario" = "stashed" ]; then
+    ( cd "$upwork" && echo UPSTREAM-EDIT >> a.txt && gci commit -aqm up-edit && gci push -q origin master )
+    ( cd "$d" && echo new > nf.txt && gci add nf.txt && gci commit -qm aw-newfile )
+    ( cd "$d" && echo DIRTY-EDIT >> a.txt )   # conflicts with upstream's a.txt edit on autostash pop
+  else
+    ( cd "$upwork" && echo more >> a.txt && gci commit -aqm up-edit && gci push -q origin master )
+    ( cd "$d" && echo new > nf.txt && gci add nf.txt && gci commit -qm aw-newfile )
+  fi
+}
+mk_aw_fork "e/wip" stashed
+mk_aw_fork "f/clean" clean
+
+GRAPHIFY_SCAN_ROOT="$ROOT" GRAPHIFY_LOG_DIR="$LOGDIR" bash "$SCRIPT" >/dev/null 2>&1
+L2="$LOGDIR/graphify-sync-LATEST.md"
+grep -qE 'rebase:CLEAN:WIP-STASHED' "$LOGDIR/graphify-sync.log" && pass "wip-stashed status observed in log" || fail "wip-stashed status missing from log"
+section="$(awk '/^## Manual attention/{flag=1} /^## Per-repo/{flag=0} flag' "$L2")"
+echo "$section" | grep -qF "/e/wip" && pass "wip-stashed collected into manual-attention section" || fail "wip-stashed NOT collected"
+echo "$section" | grep -qF "/f/clean" && fail "plain CLEAN incorrectly collected into manual-attention section" || pass "plain CLEAN correctly excluded from manual-attention"
+grep -qF "/f/clean " "$L2" && pass "plain CLEAN repo still processed and logged" || fail "clean repo missing from Per-repo log"
+
 echo "---"; if [ "$fails" -eq 0 ]; then echo "ALL PASS"; else echo "$fails FAILED"; exit 1; fi

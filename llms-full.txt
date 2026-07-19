@@ -1055,8 +1055,10 @@ Run the bundled bootstrap script against a repo:
 
 This wraps `graphify update <path>` — AST-only extraction, **no LLM and no
 API key** — and writes the graph under `<path>/graphify-out/`. Re-run it
-after large refactors that shrink the graph; pass `GRAPHIFY_FORCE=1` to
-force a full rebuild instead of an incremental one.
+after large refactors. If the refactor deleted code, pass
+`GRAPHIFY_FORCE=1` to overwrite the existing graph even when the rebuild
+has fewer nodes (the default refuses a shrinking rebuild as a safety
+check).
 
 ## Query it
 
@@ -1088,7 +1090,7 @@ commands above are cheaper.
 
 ## Keep the graph fresh
 
-Three scripts automate refreshing graphs over time so they don't go stale:
+These scripts automate refreshing graphs over time so they don't go stale:
 
 - **`scripts/graphify-hooks-install.sh`** — installs global git hooks
   (`post-commit`, `post-merge`, `post-rewrite`) that refresh a repo's graph

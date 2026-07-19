@@ -29,6 +29,7 @@ TABLE="$(mktemp)"; trap 'rm -f "$TABLE" "$TABLE.new"' EXIT
       echo "ERROR: $(basename "$f"): meta needs single-line quoted name and description" >&2
       exit 1
     fi
+    desc="${desc//|/\\|}"   # a literal | would inject a phantom table column
     printf '| `%s` | `/%s` | %s |\n' "$name" "$name" "$desc"
   done
 } > "$TABLE"

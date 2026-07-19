@@ -44,11 +44,21 @@ const DEFAULT_DIMENSIONS = [
   'test quality: theater tests, tautological assertions, missing coverage of changed behavior',
 ]
 
-const target = (args && args.target)
-  ? String(args.target)
+// args can arrive as a JSON-encoded string on some invocation paths
+// (observed live, scriptPath invocation 2026-07-19) — normalize first.
+let input = args
+if (typeof input === 'string') {
+  try { input = JSON.parse(input) } catch (_e) {
+    log('review-verify: args arrived as an unparseable string — using defaults')
+    input = null
+  }
+}
+
+const target = (input && input.target)
+  ? String(input.target)
   : 'the uncommitted working diff of the current repository (git diff HEAD; fall back to the last commit if the working tree is clean)'
-const dimensions = (args && Array.isArray(args.dimensions) && args.dimensions.length > 0)
-  ? args.dimensions.map(String)
+const dimensions = (input && Array.isArray(input.dimensions) && input.dimensions.length > 0)
+  ? input.dimensions.map(String)
   : DEFAULT_DIMENSIONS
 
 log(`review-verify: ${dimensions.length} dimension(s) over: ${target}`)

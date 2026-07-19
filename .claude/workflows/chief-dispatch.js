@@ -30,8 +30,18 @@ const REVIEW_SCHEMA = {
   },
 }
 
-const tasks = (args && Array.isArray(args.tasks) && args.tasks.length > 0) ? args.tasks
-  : (args && args.brief) ? [{ brief: args.brief }]
+// args can arrive as a JSON-encoded string on some invocation paths
+// (observed live, scriptPath invocation 2026-07-19) — normalize first.
+let input = args
+if (typeof input === 'string') {
+  try { input = JSON.parse(input) } catch (_e) {
+    log('chief-dispatch: args arrived as an unparseable string')
+    input = null
+  }
+}
+
+const tasks = (input && Array.isArray(input.tasks) && input.tasks.length > 0) ? input.tasks
+  : (input && input.brief) ? [{ brief: input.brief }]
   : null
 if (!tasks) {
   log('chief-dispatch: no tasks supplied — expected {tasks: [{brief: "<path or full text>"}]} or {brief: "..."}')

@@ -56,5 +56,25 @@ EOF
 rc=0; WORKFLOWS_DIR="$TMP/wf" DOCS_FILE="$TMP/doc.md" bash "$SUBJECT" 2>/dev/null || rc=$?
 check "missing description rejected" 1 "$rc"
 
+# Case 5: a literal | in a description is escaped in the emitted row —
+# otherwise it injects a phantom Markdown table column (fresh fixture dir:
+# Case 4 left a broken workflow in $TMP/wf)
+mkdir -p "$TMP/wf2"
+cat > "$TMP/wf2/pipey.js" <<'EOF'
+export const meta = {
+  name: 'pipey',
+  description: 'runs a | b safely',
+}
+return 1
+EOF
+cat > "$TMP/doc2.md" <<'EOF'
+<!-- workflow-table:begin -->
+<!-- workflow-table:end -->
+EOF
+rc=0; WORKFLOWS_DIR="$TMP/wf2" DOCS_FILE="$TMP/doc2.md" bash "$SUBJECT" || rc=$?
+check "pipe-description run" 0 "$rc"
+grep -qF '| `pipey` | `/pipey` | runs a \| b safely |' "$TMP/doc2.md" \
+  && { pass=$((pass+1)); echo "PASS: pipe escaped in row"; } || { fail=$((fail+1)); echo "FAIL: pipe not escaped"; }
+
 echo "---"; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

@@ -199,8 +199,8 @@ blanket allows; both were removed with no replacement, because every tool
 listed in the table above already has its own `Bash(<tool> *)` rule, which
 covers that tool's `--version`/`--help` invocations without the bypass. If
 a new tool needs unprompted version/help checks, add a scoped
-`Bash(<tool> *)` rule rather than a suffix wildcard. The `config-audit`
-skill scans for this pattern class and flags it during a config audit.
+`Bash(<tool> *)` rule rather than a suffix wildcard. Issue #15 adds a
+`config-audit` scanner check that flags this pattern class.
 
 ### Hooks configuration
 

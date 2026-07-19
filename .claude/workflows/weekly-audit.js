@@ -44,7 +44,9 @@ const AREAS = [
   {
     key: 'docs-drift',
     prompt: 'Check documentation drift: if mkdocs.yml exists, verify every nav entry resolves to an existing file under docs/. ' +
-      'Re-run every docs generator the repo ships (scripts/gen-*.sh) and report a warning per file that changes (git diff --stat after each run), then restore with git checkout -- <file>.',
+      'First run git status --porcelain and note which generated outputs are already locally modified. ' +
+      'Re-run every docs generator the repo ships (scripts/gen-*.sh) ONLY for outputs that were UNMODIFIED before the run; report a warning per file that changes (git diff --stat after each run), then restore just those with git checkout -- <file>. ' +
+      'A generated file with pre-existing uncommitted modifications must NOT be regenerated or restored — report it as a warning ("drift-unknown: file locally modified") instead of touching it.',
   },
   {
     key: 'dead-refs',

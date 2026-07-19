@@ -40,7 +40,7 @@ Add `# config-audit:ignore <category|all>` on a line to suppress a known-safe ma
 
 ## Exit Codes (for CI later)
 
-`0` clean · `1` low/medium · `2` high/critical.
+`0` clean · `1` low/medium · `2` high/critical · `3` scan aborted / nothing scanned (fails closed — e.g. missing target dir, `mktemp` failure, or a findings-buffer write error; never reports clean on abort).
 
 ## Gotchas
 

@@ -2,8 +2,9 @@
 # scan-config.sh — read-only audit of a .claude config tree.
 # Usage: scan-config.sh [DIR]   (default: ~/.claude)
 # Stdout: SEVERITY<TAB>CATEGORY<TAB>FILE:LINE<TAB>MESSAGE  (highest severity first)
-# Exit:   0 clean, 1 low/medium, 2 high/critical, 3 scan aborted (e.g. mktemp
-#         failed) -- fails closed, never silently reports clean on abort.
+# Exit:   0 clean, 1 low/medium, 2 high/critical, 3 scan aborted -- nothing
+#         scanned (missing target dir, mktemp failure, or a findings-buffer
+#         write error); fails closed, never silently reports clean on abort.
 #         macOS bash 3.2 compatible.
 set -uo pipefail
 

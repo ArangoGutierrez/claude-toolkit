@@ -3180,7 +3180,7 @@ one is enough, and maps them to the pieces this toolkit ships.
 
 **Stage 1 — Prompts.** You type, the agent acts, you read, you type again.
 You are the control flow. Perfectly fine for exploration, one-off fixes,
-and anything you'd finish before automating it would pay off.
+and anything you'd finish before automation could pay for itself.
 
 **Stage 2 — Loops.** The insight of loop engineering: stop being the
 control flow. A loop re-invokes the agent on a schedule or a trigger —
@@ -3220,7 +3220,7 @@ context window can't hold — not when a tweet does.
 
 | Stage | Component | What it does |
 |---|---|---|
-| Loops | `/loop` | recurring or self-paced re-prompting |
+| Loops | `/loop` (Cursor command) | re-run a task until its completion phrase appears, bounded by `--max` iterations |
 | Loops | scheduled tasks (cron/launchd) | headless recurring runs, e.g. weekly graph refresh |
 | Graphs | [Workflow Library](patterns/workflow-library.md) | named, reusable orchestration DAGs (`/review-verify`, `/chief-dispatch`, `/weekly-audit`) |
 | Graphs | [kickoff enrichment](architecture.md) | compiles a rough goal into a scoped prompt, acceptance checks, and a dispatch plan |

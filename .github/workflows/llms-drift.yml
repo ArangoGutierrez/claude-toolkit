@@ -1,5 +1,8 @@
 name: llms-full.txt Drift Gate
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]

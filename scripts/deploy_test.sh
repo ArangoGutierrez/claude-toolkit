@@ -75,5 +75,12 @@ rc=$(run_deploy "$TMP/d" "$TMP/d.out")
 check_rc  "D: non-git overlay aborts rc=4" 4 "$rc"
 check_has "D: abort names ls-files failure" "failed or returned nothing" "$TMP/d.out"
 
+# ── Case E: runtime-state files never transfer, even without a pointer ──
+make_fixture e
+rc=$(run_deploy "$TMP/e" "$TMP/e.out")
+check_rc     "E: exits 0" 0 "$rc"
+check_absent "E: installed_plugins.json never transfers" "installed_plugins.json" "$TMP/e.out"
+check_absent "E: policy-limits.json never transfers" "policy-limits.json" "$TMP/e.out"
+
 echo "==== Results: $pass passed, $fail failed ===="
 [ "$fail" -eq 0 ]

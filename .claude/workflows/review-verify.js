@@ -63,6 +63,7 @@ const dimensions = (input && Array.isArray(input.dimensions) && input.dimensions
 
 log(`review-verify: ${dimensions.length} dimension(s) over: ${target}`)
 
+// Model routing v3 (2026-07-08): sonnet finders, opus refuters (gates keep their tier). Override via args.finderModel / args.verifierModel.
 const results = await pipeline(
   dimensions,
   (dim) => agent(
@@ -72,7 +73,7 @@ const results = await pipeline(
     'Report only defects you can anchor to a specific file and line, each with a concrete failure scenario in `detail`. ' +
     'No style nits unless the dimension explicitly asks. ' +
     'If you find nothing real, return an empty findings array — never invent findings.',
-    { label: `review:${dim.split(/[\s:]/)[0]}`, phase: 'Review', schema: FINDINGS_SCHEMA },
+    { label: `review:${dim.split(/[\s:]/)[0]}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: (input && input.finderModel) || 'sonnet' },
   ),
   (review, dim) => {
     if (!review || !Array.isArray(review.findings) || review.findings.length === 0) return []
@@ -84,7 +85,7 @@ const results = await pipeline(
         'Read the actual code at that location and try to REFUTE it: is the claimed defect reachable, ' +
         'actually incorrect, and actually at that location? ' +
         'Set refuted=true unless the finding survives your best attempt to kill it; explain in `reason`.',
-        { label: `verify:${f.file}:${f.line}`, phase: 'Verify', schema: VERDICT_SCHEMA },
+        { label: `verify:${f.file}:${f.line}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: (input && input.verifierModel) || 'opus' },
       ).then((v) => ({ ...f, dimension: dim, verdict: v })),
     ))
   },

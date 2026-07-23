@@ -69,10 +69,11 @@ const criticPrompt = (brief, report) =>
   'REJECT with concrete, actionable issues if anything material fails the brief; otherwise APPROVE. ' +
   'Read-only plus running tests: do not fix, commit, push, or post anything.'
 
+// Model routing v3 (2026-07-08): sonnet builders (briefs are fully-specified), opus gates. Per-task override via tasks[i].model.
 const results = await pipeline(
   tasks,
   (t, _orig, i) => {
-    const opts = { label: `build:${i}`, phase: 'Build', schema: REPORT_SCHEMA }
+    const opts = { label: `build:${i}`, phase: 'Build', schema: REPORT_SCHEMA, model: t.model || 'sonnet' }
     if (isolate) opts.isolation = 'worktree'
     return agent(builderPrompt(t.brief), opts)
   },
@@ -81,7 +82,7 @@ const results = await pipeline(
     if (report.status === 'BLOCKED') {
       return { task: i, status: 'BLOCKED', issues: [], summary: report.summary, workdir: report.workdir, branch: report.branch }
     }
-    let review = await agent(criticPrompt(t.brief, report), { label: `gate:${i}`, phase: 'Gate', schema: REVIEW_SCHEMA })
+    let review = await agent(criticPrompt(t.brief, report), { label: `gate:${i}`, phase: 'Gate', schema: REVIEW_SCHEMA, model: 'opus' })
     if (review && review.verdict === 'REJECTED') {
       log(`chief-dispatch task ${i}: REJECTED (${review.issues.length} issue(s)) — one fix round`)
       const fixed = await agent(
@@ -90,10 +91,10 @@ const results = await pipeline(
         `ORIGINAL BRIEF:\n${t.brief}\n\n` +
         `REVIEW ISSUES TO FIX (fix these and only these):\n- ${review.issues.join('\n- ')}\n\n` +
         'Same discipline: real verification output in `evidence`, conventional signed commits, no pushing or posting.',
-        { label: `fix:${i}`, phase: 'Gate', schema: REPORT_SCHEMA },
+        { label: `fix:${i}`, phase: 'Gate', schema: REPORT_SCHEMA, model: t.model || 'sonnet' },
       )
       review = fixed
-        ? await agent(criticPrompt(t.brief, fixed), { label: `regate:${i}`, phase: 'Gate', schema: REVIEW_SCHEMA })
+        ? await agent(criticPrompt(t.brief, fixed), { label: `regate:${i}`, phase: 'Gate', schema: REVIEW_SCHEMA, model: 'opus' })
         : { verdict: 'REJECTED', issues: ['fix round produced no report'] }
     }
     const approved = review && review.verdict === 'APPROVED'

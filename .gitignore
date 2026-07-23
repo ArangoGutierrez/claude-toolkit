@@ -119,3 +119,6 @@ scripts/deploy-overlay.local
 
 # ── MkDocs build output (never tracked) ──
 site/
+
+# plugin registration is live runtime state, never config to deploy
+.claude/plugins/installed_plugins.json

@@ -30,6 +30,11 @@ CLAUDE_EXCLUDES=(
   plugins/marketplaces/
   settings.local.json
   settings.json
+  mcp-needs-auth-cache.json
+  policy-limits.json
+  remote-settings.json
+  plugins/.last_inuse_sweep
+  plugins/installed_plugins.json
 )
 
 CURSOR_EXCLUDES=(

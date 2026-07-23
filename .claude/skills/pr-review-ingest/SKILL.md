@@ -14,7 +14,8 @@ tools:
 Parse GitHub PR review comments, classify them, and propose rule updates.
 
 ## Limitation (until memory ships)
-Each invocation is stateless — cannot detect recurring patterns across PRs. Only high-severity findings (bug, architecture, security) are written to rules/ directly.
+
+Each invocation is stateless — it cannot detect recurring patterns across PRs on its own. High-severity findings are proposed as rule additions, not written automatically: security comments on the first occurrence, bug and architecture comments on the second. Nothing lands in `rules/` without your approval.
 
 ## Process
 
@@ -30,6 +31,7 @@ Each invocation is stateless — cannot detect recurring patterns across PRs. On
 4. **Output summary:** counts by category, new rules proposed, existing coverage
 
 ## Gotchas
+
 - Don't promote every nit to a rule
 - A single PR comment is not a pattern — note it, wait for second occurrence
 - Don't duplicate what hooks already catch

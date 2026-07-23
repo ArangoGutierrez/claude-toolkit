@@ -71,6 +71,9 @@ ISSUE_RESEARCH.md
 # ── sync-gate local overrides (never tracked) ──
 # Identity-bearing leak patterns for scripts/sync-lib.sh; local-only.
 scripts/leak-patterns.local
+# deploy overlay pointer — machine-local; names the sibling repo whose tracked
+# .claude/ paths this repo's deploy must never overwrite
+scripts/deploy-overlay.local
 # live panel config is machine-local; only the template is tracked
 .claude/panel/config.yml
 
@@ -116,3 +119,6 @@ scripts/leak-patterns.local
 
 # ── MkDocs build output (never tracked) ──
 site/
+
+# plugin registration is live runtime state, never config to deploy
+.claude/plugins/installed_plugins.json

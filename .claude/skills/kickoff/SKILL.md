@@ -82,10 +82,22 @@ Run when the user types `/kickoff <rough idea>`.
      **Dispatch plan:** section, seed from it instead of decomposing from
      scratch: brainstorm only the deltas (task boundaries the engine got wrong,
      missing tasks), then materialize per-task briefs at
-     `.superpowers/sdd/task-N-brief.md` per the rendered Dispatch contract and
-     run the chief dispatch loop (parallel where owns are disjoint and deps
-     allow), or hand the fenced JSON seed to `/orchestrate` for cmux-scale
-     work. Without a Dispatch plan section, invoke
+     `.superpowers/sdd/task-N-brief.md` per the rendered Dispatch contract.
+     Then drive the dispatch by dependency wave:
+     - Group the Dispatch plan into dependency waves: a wave is every
+       not-yet-run task whose `deps` are all satisfied by prior waves (the
+       engine guarantees the dep graph is acyclic).
+     - Per wave, invoke the chief-dispatch workflow:
+       `Workflow({name: 'chief-dispatch', args: {tasks: [{brief: '<absolute path to .superpowers/sdd/task-N-brief.md>'}, ...]}})`
+       then read each task's `status`/`issues` from the return value before
+       starting the next wave. A BLOCKED task blocks only its dependents, never
+       the wave's independent siblings.
+     - Fallback — run the manual chief dispatch loop (Agent tool per brief +
+       adversarial-critic gate) when a task needs mid-flight judgment or user
+       interaction, or when the Workflow tool is unavailable in the environment.
+
+     Or hand the fenced JSON seed to `/orchestrate` for cmux-scale work.
+     Without a Dispatch plan section, invoke
      `superpowers:brainstorming` focused on decomposing the work into disjoint,
      parallelizable tasks, then hand off to `team-plan` as before.
 

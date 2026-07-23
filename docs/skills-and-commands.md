@@ -89,7 +89,7 @@ The `/team-plan`, `/team-execute`, and `/team-shutdown` slash names are defined 
 
 ## Team Reference Material
 
-The `team-*` skills above coordinate multi-agent implementation. Their agents draw on shared reference material under `.claude/team/lib/` — the agents consult these files during the workflow, they are not loaded automatically. For the team structure, roles, and communication protocol, see the per-skill READMEs linked in the skills table above.
+The `team-*` skills above coordinate multi-agent implementation. Shared reference material lives under `.claude/team/lib/` — retained for reference; nothing currently loads or references it automatically. For the team structure, roles, and communication protocol, see the per-skill READMEs linked in the skills table above.
 
 | File | Used by | Purpose |
 |------|---------|---------|

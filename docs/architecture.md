@@ -387,7 +387,7 @@ The `team/lib/` subdirectory holds 11 files organized by concern:
 - **Observability:** `architect-observability.md` (metrics/logs/traces, SLI/SLO, alerting patterns, OpenTelemetry)
 - **Quality:** `qa-validator.md` (validation checklist for git signatures, language checks, CI replication, PR metadata)
 
-These files document domain-specific knowledge for the team workflow — the `architect-*.md` design guidance, `qa-validator.md`'s validation checklist, and the planning and decision templates — beyond an agent's base capabilities. They are reference material the workflow points to, not resources any agent loads automatically.
+These files document domain-specific knowledge for the team workflow — the `architect-*.md` design guidance, `qa-validator.md`'s validation checklist, and the planning and decision templates — beyond an agent's base capabilities. They are retained for reference; nothing currently loads or references them automatically.
 
 ---
 

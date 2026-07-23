@@ -49,6 +49,40 @@ CURSOR_EXCLUDES=(
   skills/
 )
 
+# --- Overlay exclusions (a local overlay repo owns its tracked .claude paths) ---
+# scripts/deploy-overlay.local (untracked; see .gitignore) holds ONE line: the
+# absolute path of a sibling repo whose tracked .claude/ paths must never be
+# deployed from THIS repo (the overlay owns them). The exclusion set is
+# computed LIVE from the overlay's git index at deploy time — never a
+# snapshot. Fail-closed: a configured-but-unresolvable overlay aborts the
+# deploy (exit 4); an absent pointer is a no-op (upstream-only installs).
+OVERLAY_EXCLUDE_FILE=""
+trap 'rm -f "${OVERLAY_EXCLUDE_FILE:-}"' EXIT
+
+build_overlay_excludes() {
+  local pointer="$SCRIPT_DIR/deploy-overlay.local"
+  [[ -f "$pointer" ]] || return 0
+  local overlay_repo
+  overlay_repo="$(head -n1 "$pointer" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+  if [[ -z "$overlay_repo" || ! -d "$overlay_repo" ]]; then
+    echo "ERROR: overlay pointer $pointer names a missing directory: '$overlay_repo'" >&2
+    exit 4
+  fi
+  local listing
+  if ! listing="$(git -C "$overlay_repo" ls-files '.claude/*' 2>/dev/null)" || [[ -z "$listing" ]]; then
+    echo "ERROR: overlay repo $overlay_repo: 'git ls-files .claude/*' failed or returned nothing — refusing to deploy over overlay-owned paths" >&2
+    exit 4
+  fi
+  OVERLAY_EXCLUDE_FILE="$(mktemp)"
+  # Anchor every pattern at the transfer root (leading /): an unanchored
+  # rsync pattern matches at ANY depth and would over-exclude same-named
+  # deeper files (e.g. /rules/x.md must not shadow team/rules/x.md).
+  printf '%s\n' "$listing" | sed -e 's|^\.claude/|/|' > "$OVERLAY_EXCLUDE_FILE"
+  local n
+  n="$(wc -l < "$OVERLAY_EXCLUDE_FILE" | tr -d ' ')"
+  echo ">> overlay: excluding $n overlay-owned paths (from $overlay_repo)"
+}
+
 # --- Defaults ---
 DRY_RUN=false
 FORCE=false
@@ -178,6 +212,9 @@ deploy_claude() {
   if $NO_PLUGINS; then
     exclude_args+=(--exclude "plugins/")
   fi
+  if [[ -n "$OVERLAY_EXCLUDE_FILE" ]]; then
+    exclude_args+=(--exclude-from "$OVERLAY_EXCLUDE_FILE")
+  fi
 
   run_rsync "$src" "$dest" "${exclude_args[@]}"
 }
@@ -285,6 +322,7 @@ echo ""
 do_backup
 
 if ! $CURSOR_ONLY; then
+  build_overlay_excludes
   deploy_claude
 fi
 if ! $CLAUDE_ONLY; then

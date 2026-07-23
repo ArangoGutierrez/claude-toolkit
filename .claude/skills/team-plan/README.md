@@ -50,10 +50,9 @@ No environment variables.
 
 ## Notes
 
-- Two entry points ship the same workflow: the command
-  (`.claude/commands/team-plan.md`, what `/team-plan` runs) and an
-  auto-triggerable skill copy (`.claude/skills/team-plan/SKILL.md`). Invoke
-  via `/team-plan`.
+- The `/team-plan` slash name is provided by this skill
+  (`.claude/skills/team-plan/SKILL.md`), which the agent can also trigger
+  automatically. Invoke it via `/team-plan`.
 - Mandatory spawn order in the next phase is Principal Engineer, then QA,
   then up to 3 Workers (5 agents max); more than 3 tasks means waves, with
   the Principal Engineer and QA persisting across all of them.

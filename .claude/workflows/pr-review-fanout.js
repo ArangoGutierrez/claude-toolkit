@@ -213,12 +213,23 @@ log(`pr-review-fanout: ${reviewers.length} reviewer(s) (${genericReviewers.lengt
 
 const degradedReviewers = []
 
+// The specialist agent types come from ~/.claude/agents/. The terminal CLI scans
+// that directory; the SDK/desktop host populates its registry from the SDK
+// `agents` option instead, so an unregistered type throws and pipeline() would
+// drop the specialist to null — losing the reviewer while degradedReviewers
+// stayed empty and the report still read clean. Fall back to 'general-purpose'
+// (present on every host) so the checklist prompt still runs, and record the
+// downgrade: the specialist keeps its lens but loses its tuned tool set.
 const results = await pipeline(
   reviewers,
   (r) => {
-    const opts = { label: `review:${r.name}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: 'sonnet' }
-    if (r.agentType) opts.agentType = r.agentType
-    return agent(r.prompt, opts)
+    const base = { label: `review:${r.name}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: 'sonnet' }
+    if (!r.agentType) return agent(r.prompt, base)
+    return agent(r.prompt, { ...base, agentType: r.agentType }).catch((e) => {
+      if (!/agent type .* not found/i.test(String((e && e.message) || e))) throw e
+      degradedReviewers.push(`${r.name} (agent type "${r.agentType}" not registered on this host — ran as general-purpose)`)
+      return agent(r.prompt, { ...base, agentType: 'general-purpose' })
+    })
   },
   (review, r) => {
     if (review && review.degraded === true) degradedReviewers.push(r.name)

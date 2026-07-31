@@ -18,11 +18,18 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 pass=0; fail=0
 
-for required in "$HARNESS" "$SUBJECT"; do
-  if [ ! -f "$required" ]; then
-    echo "ERROR: missing $required" >&2
-    exit 1
+# Prerequisites: the two files this suite drives, plus jq, which every assertion
+# below runs the harness report through. `jq` is in ubuntu-latest, so the CI gate
+# never trips this — the point is that a bare machine gets the same clear line as
+# a missing file instead of a cryptic `jq: command not found` mid-suite.
+# `[ -f ]` cannot see a binary on PATH and `command -v` is the check that can, so
+# each entry passes on either.
+for required in "$HARNESS" "$SUBJECT" jq; do
+  if [ -f "$required" ] || command -v "$required" > /dev/null 2>&1; then
+    continue
   fi
+  echo "ERROR: missing prerequisite: $required" >&2
+  exit 1
 done
 
 expect() { # <desc> <jq filter> <scenario-name>

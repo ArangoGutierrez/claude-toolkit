@@ -23,13 +23,16 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 pass=0; fail=0
 
-# Prerequisites: the two files this suite drives, plus jq, which every assertion
-# below runs the harness report through. `jq` is in ubuntu-latest, so the CI gate
-# never trips this — the point is that a bare machine gets the same clear line as
-# a missing file instead of a cryptic `jq: command not found` mid-suite.
-# `[ -f ]` cannot see a binary on PATH and `command -v` is the check that can, so
-# each entry passes on either.
-for required in "$HARNESS" "$SUBJECT" "$FANOUT" jq; do
+# Prerequisites: the two files this suite drives, plus the two binaries every
+# case needs — `node`, which runs the harness, and `jq`, which every assertion
+# below runs the harness report through. Both are in ubuntu-latest, so the CI
+# gate never trips this — the point is that a bare machine gets the same clear
+# line as a missing file instead of a cryptic `command not found` mid-suite.
+# `node` earns its place here: without it every `run` fails at rc=127 and the
+# suite prints 189 lines of cascading FAILs before it stops. `[ -f ]` cannot see
+# a binary on PATH and `command -v` is the check that can, so each entry passes
+# on either.
+for required in "$HARNESS" "$SUBJECT" "$FANOUT" node jq; do
   if [ -f "$required" ] || command -v "$required" > /dev/null 2>&1; then
     continue
   fi

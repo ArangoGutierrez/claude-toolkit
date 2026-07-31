@@ -189,8 +189,13 @@ expect "fanout-all-dead: all 5 reviewers launched, in order" \
   ".agents == $FREVIEWERS" fanout-all-dead
 expect "fanout-all-dead: return carries the exact abort error" \
   '.return.error == "pr-review-fanout: all 5 of 5 reviewer agent(s) died; no review ran"' fanout-all-dead
-expect "fanout-all-dead: return carries the dead count" '.return.deadReviewers == 5' fanout-all-dead
-expect "fanout-all-dead: return carries the attempted count" '.return.attemptedReviewers == 5' fanout-all-dead
+# The fields carry a `Count` suffix because `degradedReviewers`, a list of names,
+# sits beside them. Assert the suffixed names AND the absence of the bare ones, so
+# a revert to `deadReviewers` reinstates the collision under a green suite.
+expect "fanout-all-dead: return carries the dead count" '.return.deadReviewerCount == 5' fanout-all-dead
+expect "fanout-all-dead: return carries the attempted count" '.return.attemptedReviewerCount == 5' fanout-all-dead
+expect "fanout-all-dead: no bare deadReviewers/attemptedReviewers beside the degradedReviewers list" \
+  '(.return | has("deadReviewers") | not) and (.return | has("attemptedReviewers") | not)' fanout-all-dead
 expect "fanout-all-dead: the abort reaches the log stream verbatim" \
   '.logs | index("pr-review-fanout: all 5 of 5 reviewer agent(s) died; no review ran") != null' fanout-all-dead
 # Nothing to score when nothing was reviewed. Without this the guard could be

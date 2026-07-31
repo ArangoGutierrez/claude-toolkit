@@ -248,8 +248,11 @@ const degradedReviewers = []
 // rate limit or a terminal API error, which both arrive as a resolved null.
 // INVARIANT:
 //   1. when EVERY reviewer returns null, the return value carries a truthy `error` plus
-//      `deadReviewers` and `attemptedReviewers`, which are COUNTS — unlike the
-//      `degradedReviewers` list of names alongside them;
+//      `deadReviewerCount` and `attemptedReviewerCount`. The `Count` suffix is not
+//      decoration: `degradedReviewers`, a LIST OF NAMES, sits in the same object, so a
+//      bare `deadReviewers` would invite `result.deadReviewers.length` and hand back
+//      `undefined` with no error. review-verify.js has no such sibling list, so its
+//      `deadFinders`/`attemptedFinders` pair carries no collision and keeps those names;
 //   2. when at least one reviewer RETURNS A RESULT, the return value carries no `error`,
 //      even if that result has zero findings, and even if every finding it did raise
 //      scores below the survival threshold;
@@ -359,10 +362,10 @@ const out = {
 // path that legitimately runs zero reviewers cannot report "all 0 of 0 reviewer
 // agent(s) died", but do not read it as reachable today.
 if (reviewers.length > 0 && liveReviewers === 0) {
-  const deadReviewers = reviewers.length - liveReviewers
-  out.error = `pr-review-fanout: all ${deadReviewers} of ${reviewers.length} reviewer agent(s) died; no review ran`
-  out.deadReviewers = deadReviewers
-  out.attemptedReviewers = reviewers.length
+  const deadReviewerCount = reviewers.length - liveReviewers
+  out.error = `pr-review-fanout: all ${deadReviewerCount} of ${reviewers.length} reviewer agent(s) died; no review ran`
+  out.deadReviewerCount = deadReviewerCount
+  out.attemptedReviewerCount = reviewers.length
   log(out.error)
 }
 return out

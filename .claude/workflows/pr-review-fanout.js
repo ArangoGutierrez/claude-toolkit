@@ -297,14 +297,19 @@ const results = await pipeline(
     return agent(
       batchScorePrompt(findings, r.name),
       { label: `score:${r.name}`, phase: 'Score', schema: BATCH_SCORE_SCHEMA, model: 'haiku' },
-    // DEFENSIVE ONLY, and not reachable today: agent() reports death as a resolved
-    // null, and the scorer passes no agentType, so it has no `agent type not found`
-    // path to throw on. It is here because the per-finding scorer this replaced ran
-    // inside parallel(), which absorbed a throw into null. Without it a throw would
-    // propagate to pipeline, drop this whole item, and lose the reviewer's findings
-    // SILENTLY — worse than the documented "unscored means 0". Funnel it into exactly
-    // the dead-batch path below instead. No behaviour test can pin this: the harness's
-    // agent() stub never throws, by design.
+    // SCOPE: this catch covers a throw from the agent() call ABOVE it and nothing
+    // else. A throw inside the .then body below is NOT covered — it propagates to
+    // pipeline, drops this whole item, and loses the reviewer's findings SILENTLY.
+    // That body reads only its own locals and plain fields off `batch`, so no input
+    // the scorer can return reaches a throwing path there today.
+    //
+    // DEFENSIVE ONLY, and not reachable today either: agent() reports death as a
+    // resolved null, and the scorer passes no agentType, so it has no `agent type
+    // not found` path to throw on. It is here because the per-finding scorer this
+    // replaced ran inside parallel(), which absorbed a throw into null. Funnel a
+    // throw into exactly the dead-batch path below instead, which is the documented
+    // "unscored means 0". No behaviour test can pin this: the harness's agent() stub
+    // never throws, by design.
     ).catch(() => null).then((batch) => {
       // Match each score to its finding BY ID, never by array position. Nothing
       // guarantees the model returns its entries in the order it was given them, and

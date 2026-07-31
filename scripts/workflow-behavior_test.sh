@@ -25,14 +25,6 @@ for required in "$HARNESS" "$SUBJECT"; do
   fi
 done
 
-run() { # <scenario-name> — reads $TMP/<name>.json, writes $TMP/<name>.out
-  local name="$1" rc=0
-  node "$HARNESS" "$SUBJECT" "$TMP/$name.json" > "$TMP/$name.out" 2> "$TMP/$name.err" || rc=$?
-  if [ "$rc" -ne 0 ]; then
-    echo "  (harness rc=$rc, stderr: $(cat "$TMP/$name.err"))"
-  fi
-}
-
 expect() { # <desc> <jq filter> <scenario-name>
   local desc="$1" filter="$2" name="$3"
   if jq -e "$filter" < "$TMP/$name.out" > /dev/null 2>&1; then
@@ -42,6 +34,23 @@ expect() { # <desc> <jq filter> <scenario-name>
     echo "  filter: $filter"
     echo "  report: $(cat "$TMP/$name.out")"
   fi
+}
+
+run() { # <scenario-name> — reads $TMP/<name>.json, writes $TMP/<name>.out
+  local name="$1" rc=0
+  node "$HARNESS" "$SUBJECT" "$TMP/$name.json" > "$TMP/$name.out" 2> "$TMP/$name.err" || rc=$?
+  if [ "$rc" -ne 0 ]; then
+    fail=$((fail + 1))
+    echo "FAIL: $name: harness exited rc=$rc — stderr: $(cat "$TMP/$name.err")"
+    return 0
+  fi
+  # Anti-vacuity gate, and it is not optional. When the workflow throws, the
+  # harness reports {"return": null}, and jq evaluates `null | has("error")`
+  # to false and `null | length` to 0 — so EVERY "no error field" and "zero
+  # confirmed" assertion below would pass against a workflow that never ran.
+  # Pin the return to a real object first, so those assertions mean something.
+  expect "$name: the workflow returned an object and did not throw" \
+    '(.return | type) == "object" and (has("threw") | not)' "$name"
 }
 
 ARGS='{"target":"probe-target","dimensions":["alpha","beta","gamma"]}'

@@ -111,6 +111,11 @@ confirmed.sort((a, b) => rankOf(a.severity) - rankOf(b.severity))
 log(`review-verify: ${confirmed.length}/${flat.length} finding(s) survived adversarial verification`)
 
 const out = { target, dimensions, confirmed, refutedCount: flat.length - confirmed.length }
+// `dimensions.length > 0` is DEFENSIVE ONLY — it cannot be false today. The
+// DEFAULT_DIMENSIONS fallback above yields 3 entries for an empty, absent or
+// non-array `args.dimensions`, so `dimensions` is never empty here. Keep the
+// check so a future path that legitimately runs zero finders cannot report
+// "all 0 of 0 finder agent(s) died", but do not read it as reachable today.
 if (dimensions.length > 0 && liveFinders === 0) {
   const deadFinders = dimensions.length - liveFinders
   out.error = `review-verify: all ${deadFinders} of ${dimensions.length} finder agent(s) died; no review ran`

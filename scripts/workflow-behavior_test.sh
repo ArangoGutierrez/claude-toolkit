@@ -352,6 +352,14 @@ expect "fanout-score-badids: the invented id 7 adds no phantom finding" \
   '.return.counts.raw == 3 and .return.counts.survived == 1' fanout-score-badids
 expect "fanout-score-badids: exactly one finding is returned" \
   '(.return.findings | type) == "array" and (.return.findings | length == 1)' fanout-score-badids
+# The bounds check is redundant for the LOOKUP — `byId.get(i)` walks the real
+# indices, so an out-of-range key can never be read back. Its one observable
+# effect is `byId.size`, which the shortfall log reports. Match the line exactly:
+# drop the bounds check and the invented id 7 inflates the count, so the line
+# reads "2 usable score(s)" and this assertion fails. A prefix match would not
+# discriminate, because the line still fires either way.
+expect "fanout-score-badids: the shortfall log counts 1 usable score, not the invented id" \
+  '.logs | index("pr-review-fanout: scorer for bug-scan returned 1 usable score(s) for 3 finding(s); the rest score 0") != null' fanout-score-badids
 
 # ---------------------------------------------------------------------------
 # Case 12: blast radius. One dead scorer used to cost ONE finding; batched, it
@@ -398,6 +406,41 @@ expect "fanout-threshold: a finding scored 79 does not survive" \
   '[.return.findings[] | select(.file == "src/at-seventynine.js")] | length == 0' fanout-threshold
 expect "fanout-threshold: 2 scored, 1 survives" \
   '.return.counts.raw == 2 and .return.counts.survived == 1' fanout-threshold
+
+# ---------------------------------------------------------------------------
+# Case 14: the batch scorer returns TWO entries for the SAME id, with different
+# scores. Only one can win, and the documented contract is that the FIRST one
+# does — `if (byId.has(s.id)) continue`. Drop that line and `byId.set` overwrites,
+# so the LAST entry wins instead. Here that flips alpha from posted to dropped.
+#
+# alpha (id 0) is scored twice: 95 first, then 10. bravo (id 1) is scored once,
+# at 90, and is the control — a duplicate must not disturb its neighbour.
+#   first wins (correct): alpha 95 survives, bravo 90 survives -> 2 survive
+#   last wins  (broken) : alpha 10 dropped,  bravo 90 survives -> 1 survives
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-score-dupids.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {"review:bug-scan": {"findings": [
+     {"file":"src/alpha.js","line":11,"description":"d-alpha","category":"bug","severity":"must-fix","reason":"r0"},
+     {"file":"src/bravo.js","line":22,"description":"d-bravo","category":"bug","severity":"must-fix","reason":"r1"}],
+    "degraded": false}},
+   "byLabelPrefix": {"score:": {"scores": [
+     {"id":0,"score":95,"rationale":"r-alpha-first"},
+     {"id":0,"score":10,"rationale":"r-alpha-second"},
+     {"id":1,"score":90,"rationale":"r-bravo"}]}}}}
+EOF
+run fanout-score-dupids "$FANOUT"
+expect "fanout-score-dupids: alpha takes the FIRST duplicate's score of 95, not the second's 10" \
+  '[.return.findings[] | select(.file == "src/alpha.js")] | length == 1 and (.[0].score == 95)' fanout-score-dupids
+# scoreRationale is an independent signal: a fix that keeps the first score but
+# the second rationale still fails here.
+expect "fanout-score-dupids: alpha takes the FIRST duplicate's rationale" \
+  '[.return.findings[] | select(.file == "src/alpha.js")][0].scoreRationale == "r-alpha-first"' fanout-score-dupids
+expect "fanout-score-dupids: the control finding bravo is untouched at 90" \
+  '[.return.findings[] | select(.file == "src/bravo.js")] | length == 1 and (.[0].score == 90)' fanout-score-dupids
+expect "fanout-score-dupids: 2 scored, both survive" \
+  '.return.counts.raw == 2 and .return.counts.survived == 2' fanout-score-dupids
 
 echo "---"; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

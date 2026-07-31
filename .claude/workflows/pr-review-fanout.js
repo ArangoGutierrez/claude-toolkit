@@ -58,12 +58,25 @@ const FINDINGS_SCHEMA = {
   },
 }
 
-const SCORE_SCHEMA = {
+// One scorer agent scores a whole reviewer's findings in a single call, so each
+// entry has to say WHICH finding it scored. `id` is that link, and it is
+// required: a score that cannot be traced back to its finding is unusable.
+const BATCH_SCORE_SCHEMA = {
   type: 'object',
-  required: ['score', 'rationale'],
+  required: ['scores'],
   properties: {
-    score: { type: 'integer', minimum: 0, maximum: 100 },
-    rationale: { type: 'string' },
+    scores: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['id', 'score', 'rationale'],
+        properties: {
+          id: { type: 'integer', description: 'the id of the finding being scored, copied exactly from the prompt' },
+          score: { type: 'integer', minimum: 0, maximum: 100 },
+          rationale: { type: 'string' },
+        },
+      },
+    },
   },
 }
 
@@ -190,24 +203,39 @@ const specialistReviewers = domains
 
 const reviewers = genericReviewers.concat(specialistReviewers)
 
-const scorePrompt = (f, reviewerName) =>
-  'Score, from 0 to 100, your confidence that this PR-review finding is a real defect worth posting. Use this ' +
-  'rubric verbatim:\n\n' +
+// One scorer per reviewer instead of one per finding: 11 reviewers x 5 findings was 55
+// scorer agents on top of 11 reviewers, uncapped, for a single review.
+//
+// KNOWN RISK, accepted deliberately. A single agent handed a list tends to rank its
+// entries against each other, and the survival threshold is an ABSOLUTE cut-off, so a
+// relative calibration changes which findings get posted. The anti-anchoring paragraph
+// below is the counterweight and is load-bearing — do not trim it. RUBRIC and GUARDRAILS
+// stay verbatim from the pr-review skill.
+const batchScorePrompt = (findings, reviewerName) =>
+  `Score each of the ${findings.length} PR-review finding(s) below, from 0 to 100, for your confidence that it ` +
+  'is a real defect worth posting. Use this rubric verbatim:\n\n' +
   RUBRIC + '\n\n' +
-  'Finding under review:\n' +
-  `- file: ${f.file}\n` +
-  `- line: ${f.line}\n` +
-  `- severity: ${f.severity}\n` +
-  `- category: ${f.category}\n` +
-  `- description: ${f.description}\n` +
-  `- reason flagged: ${f.reason}\n` +
-  `- raised by reviewer: ${reviewerName}\n\n` +
+  'Judge EVERY finding INDEPENDENTLY, against the absolute rubric above. Do NOT compare the findings with each ' +
+  'other, do NOT rank them, and do NOT spread the scores apart to separate them: the rubric is an absolute scale, ' +
+  'so giving two findings the same score is correct whenever they merit the same rubric level. Score each finding ' +
+  'exactly as you would if it were the only finding you had been given.\n\n' +
+  `Findings raised by reviewer ${reviewerName}:\n` +
+  findings.map((f, i) =>
+    `\n[id ${i}]\n` +
+    `- file: ${f.file}\n` +
+    `- line: ${f.line}\n` +
+    `- severity: ${f.severity}\n` +
+    `- category: ${f.category}\n` +
+    `- description: ${f.description}\n` +
+    `- reason flagged: ${f.reason}\n`).join('') + '\n' +
   'Apply these false-positive guardrails when scoring:\n' +
   GUARDRAILS + '\n\n' +
-  'If this finding was flagged for CLAUDE.md adherence, first confirm the relevant CLAUDE.md actually calls the ' +
+  'If a finding was flagged for CLAUDE.md adherence, first confirm the relevant CLAUDE.md actually calls the ' +
   'issue out; if it does not, score it low. Specialist findings get NO special treatment — the same threshold and ' +
   'the same rubric apply to every finding regardless of which reviewer produced it.\n' +
-  'Return an integer score (0-100) and a one-line rationale.'
+  'Return one entry in `scores` for every finding above. Each entry MUST repeat that finding\'s `id` exactly as ' +
+  'given, because the id is what matches your score back to its finding; the order of your entries does not ' +
+  'matter. Give an integer score (0-100) and a one-line rationale for each.'
 
 log(`pr-review-fanout: ${reviewers.length} reviewer(s) (${genericReviewers.length} generic + ${specialistReviewers.length} specialist), diff at ${diffPath}`)
 
@@ -262,17 +290,51 @@ const results = await pipeline(
   (review, r) => {
     if (review && review.degraded === true) degradedReviewers.push(r.name)
     if (!review || !Array.isArray(review.findings) || review.findings.length === 0) return []
-    return parallel(review.findings.map((f) => () =>
-      agent(
-        scorePrompt(f, r.name),
-        { label: `score:${f.file}:${f.line}`, phase: 'Score', schema: SCORE_SCHEMA, model: 'haiku' },
-      ).then((s) => ({
-        ...f,
-        score: (s && typeof s.score === 'number') ? s.score : 0,
-        scoreRationale: (s && s.rationale) || '',
-        reviewer: r.name,
-      })),
-    ))
+    const findings = review.findings
+    return agent(
+      batchScorePrompt(findings, r.name),
+      { label: `score:${r.name}`, phase: 'Score', schema: BATCH_SCORE_SCHEMA, model: 'haiku' },
+    // DEFENSIVE ONLY, and not reachable today: agent() reports death as a resolved
+    // null, and the scorer passes no agentType, so it has no `agent type not found`
+    // path to throw on. It is here because the per-finding scorer this replaced ran
+    // inside parallel(), which absorbed a throw into null. Without it a throw would
+    // propagate to pipeline, drop this whole item, and lose the reviewer's findings
+    // SILENTLY — worse than the documented "unscored means 0". Funnel it into exactly
+    // the dead-batch path below instead. No behaviour test can pin this: the harness's
+    // agent() stub never throws, by design.
+    ).catch(() => null).then((batch) => {
+      // Match each score to its finding BY ID, never by array position. Nothing
+      // guarantees the model returns its entries in the order it was given them, and
+      // an off-by-one here silently attaches one finding's confidence to another —
+      // which then decides what gets posted on a real PR. The id is the index the
+      // prompt handed out, so it doubles as the bounds check that rejects an id the
+      // model invented.
+      const byId = new Map()
+      const entries = (batch && Array.isArray(batch.scores)) ? batch.scores : []
+      for (const s of entries) {
+        if (!s || !Number.isInteger(s.id)) continue
+        if (s.id < 0 || s.id >= findings.length) continue
+        if (byId.has(s.id)) continue // duplicate id: the first entry wins
+        byId.set(s.id, s)
+      }
+      // The blast radius grew with the batch: one dead scorer used to cost a single
+      // finding, now it costs this reviewer's whole list. Unscored still means score
+      // 0, as it always did, but the caller must be able to see it happened.
+      if (!batch) {
+        degradedReviewers.push(`${r.name} (scorer returned no result; its findings scored 0)`)
+      } else if (byId.size < findings.length) {
+        log(`pr-review-fanout: scorer for ${r.name} returned ${byId.size} usable score(s) for ${findings.length} finding(s); the rest score 0`)
+      }
+      return findings.map((f, i) => {
+        const s = byId.get(i)
+        return {
+          ...f,
+          score: (s && typeof s.score === 'number') ? s.score : 0,
+          scoreRationale: (s && s.rationale) || '',
+          reviewer: r.name,
+        }
+      })
+    })
   },
 )
 

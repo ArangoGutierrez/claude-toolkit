@@ -63,6 +63,19 @@ const dimensions = (input && Array.isArray(input.dimensions) && input.dimensions
 
 log(`review-verify: ${dimensions.length} dimension(s) over: ${target}`)
 
+// Abort guard (2026-07-31). `agent()` resolves to null when an agent dies — it does not throw —
+// so without this counter a run where every finder died is indistinguishable from a clean review.
+// INVARIANT:
+//   1. when EVERY finder returns null, the return value carries a truthy `error` plus
+//      `deadFinders` and `attemptedFinders`;
+//   2. when at least one finder RETURNS A RESULT, the return value carries no `error`, even if
+//      that result has zero findings, and even if every finding is later refuted.
+// `liveFinders` counts finders that returned an object, NOT finders that found something. That
+// distinction is the whole guard: keying on confirmed.length would turn every clean review into
+// an error. The count increments in stage 1, where the null originates, so the guard does not
+// depend on whether pipeline runs stage 2 for a null-valued item.
+let liveFinders = 0
+
 // Model routing v3 (2026-07-08): sonnet finders, opus refuters (gates keep their tier). Override via args.finderModel / args.verifierModel.
 const results = await pipeline(
   dimensions,
@@ -74,7 +87,7 @@ const results = await pipeline(
     'No style nits unless the dimension explicitly asks. ' +
     'If you find nothing real, return an empty findings array — never invent findings.',
     { label: `review:${dim.split(/[\s:]/)[0]}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: (input && input.finderModel) || 'sonnet' },
-  ),
+  ).then((review) => { if (review) liveFinders++; return review }),
   (review, dim) => {
     if (!review || !Array.isArray(review.findings) || review.findings.length === 0) return []
     return parallel(review.findings.map((f) => () =>
@@ -96,4 +109,13 @@ const confirmed = flat.filter((f) => f.verdict && f.verdict.refuted === false)
 const rankOf = (s) => (s === 'critical' ? 0 : s === 'major' ? 1 : s === 'minor' ? 2 : 3)
 confirmed.sort((a, b) => rankOf(a.severity) - rankOf(b.severity))
 log(`review-verify: ${confirmed.length}/${flat.length} finding(s) survived adversarial verification`)
-return { target, dimensions, confirmed, refutedCount: flat.length - confirmed.length }
+
+const out = { target, dimensions, confirmed, refutedCount: flat.length - confirmed.length }
+if (dimensions.length > 0 && liveFinders === 0) {
+  const deadFinders = dimensions.length - liveFinders
+  out.error = `review-verify: all ${deadFinders} of ${dimensions.length} finder agent(s) died; no review ran`
+  out.deadFinders = deadFinders
+  out.attemptedFinders = dimensions.length
+  log(out.error)
+}
+return out

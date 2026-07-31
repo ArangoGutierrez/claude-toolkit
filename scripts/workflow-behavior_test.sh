@@ -69,6 +69,11 @@ expect "all-dead: return carries the exact abort error" \
   '.return.error == "review-verify: all 3 of 3 finder agent(s) died; no review ran"' all-dead
 expect "all-dead: return carries the dead count" '.return.deadFinders == 3' all-dead
 expect "all-dead: return carries the attempted count" '.return.attemptedFinders == 3' all-dead
+# The guard also logs the abort. Nothing else asserted on .logs, so a workflow
+# that returned the error but logged nothing would have shipped unnoticed.
+# Match the exact line, not a prefix: a truncated or reworded log is a defect.
+expect "all-dead: the abort reaches the log stream verbatim" \
+  '.logs | index("review-verify: all 3 of 3 finder agent(s) died; no review ran") != null' all-dead
 
 # ---------------------------------------------------------------------------
 # Case 2: one finder lives and its finding survives verification.
@@ -105,7 +110,13 @@ run one-live-empty
 expect "one-live-empty: harness launched all 3 finders" '.agents | length == 3' one-live-empty
 expect "one-live-empty: NO error field (a live finder found nothing)" \
   '.return | has("error") | not' one-live-empty
-expect "one-live-empty: zero confirmed findings" '.return.confirmed | length == 0' one-live-empty
+# Assert the TYPE as well as the length, and it is not optional. jq evaluates
+# `null | length` to 0, so a bare `.return.confirmed | length == 0` also passes
+# when `confirmed` is ABSENT — the same vacuous-pass class as the `.return`
+# gate above. Pin it to an array first, so "zero confirmed" means the workflow
+# built the list and left it empty.
+expect "one-live-empty: zero confirmed findings" \
+  '(.return.confirmed | type) == "array" and (.return.confirmed | length == 0)' one-live-empty
 
 # ---------------------------------------------------------------------------
 # Case 4: every finder lives and every one reports nothing — a clean review.
@@ -116,7 +127,8 @@ EOF
 run all-live-empty
 expect "all-live-empty: harness launched all 3 finders" '.agents | length == 3' all-live-empty
 expect "all-live-empty: NO error field" '.return | has("error") | not' all-live-empty
-expect "all-live-empty: zero confirmed findings" '.return.confirmed | length == 0' all-live-empty
+expect "all-live-empty: zero confirmed findings" \
+  '(.return.confirmed | type) == "array" and (.return.confirmed | length == 0)' all-live-empty
 
 # ---------------------------------------------------------------------------
 # Case 5: a live finder reports a finding and the verifier refutes it.
@@ -132,7 +144,8 @@ cat > "$TMP/all-refuted.json" <<EOF
 EOF
 run all-refuted
 expect "all-refuted: NO error field" '.return | has("error") | not' all-refuted
-expect "all-refuted: zero confirmed findings" '.return.confirmed | length == 0' all-refuted
+expect "all-refuted: zero confirmed findings" \
+  '(.return.confirmed | type) == "array" and (.return.confirmed | length == 0)' all-refuted
 expect "all-refuted: one finding counted as refuted" '.return.refutedCount == 1' all-refuted
 
 echo "---"; echo "pass=$pass fail=$fail"

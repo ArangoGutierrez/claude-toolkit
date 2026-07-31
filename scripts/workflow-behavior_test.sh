@@ -256,5 +256,148 @@ expect "fanout-partial: exactly the 3 dead reviewers are degraded" \
 expect "fanout-partial: counts reflect the one scored finding" \
   '.return.counts.raw == 1 and .return.counts.survived == 1' fanout-partial
 
+# ---------------------------------------------------------------------------
+# Case 9: ONE scorer agent per reviewer, not one per finding. This is the case
+# that proves the batch actually happened — 11 reviewers x 5 findings used to
+# mean 66 agents for a single review, with no cap.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-batch-count.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {"review:bug-scan": {"findings": [
+     {"file":"src/x.js","line":1,"description":"d0","category":"bug","severity":"must-fix","reason":"r0"},
+     {"file":"src/y.js","line":2,"description":"d1","category":"bug","severity":"must-fix","reason":"r1"},
+     {"file":"src/z.js","line":3,"description":"d2","category":"bug","severity":"must-fix","reason":"r2"}],
+    "degraded": false}},
+   "byLabelPrefix": {"score:": {"scores": [
+     {"id":0,"score":90,"rationale":"a"},{"id":1,"score":90,"rationale":"b"},{"id":2,"score":90,"rationale":"c"}]}}}}
+EOF
+run fanout-batch-count "$FANOUT"
+expect "fanout-batch-count: 3 findings from one reviewer spawn exactly ONE scorer" \
+  '[.agents[] | select(startswith("score:"))] | length == 1' fanout-batch-count
+expect "fanout-batch-count: the scorer is labelled per reviewer, not per finding" \
+  '[.agents[] | select(startswith("score:"))] == ["score:bug-scan"]' fanout-batch-count
+expect "fanout-batch-count: 6 agents total (5 reviewers + 1 scorer), not 8" \
+  '.agents | length == 6' fanout-batch-count
+expect "fanout-batch-count: batching loses no finding — all 3 scored and survive" \
+  '.return.counts.raw == 3 and .return.counts.survived == 3' fanout-batch-count
+
+# ---------------------------------------------------------------------------
+# Case 10: THE MAPPING CASE. The batch scorer returns its entries in an order
+# that does NOT match the order of the findings it was given. A mapping by
+# array position silently attaches each score to the wrong finding, and the
+# threshold then posts the wrong things on a real PR.
+#
+# Every assertion looks findings up BY FILE, never by position, so the test
+# itself cannot inherit the bug it is hunting. scoreRationale is checked as
+# well as score: it is an independent signal, so a mapping fixed for one field
+# and not the other still fails here.
+#
+# Input order  : alpha(id 0), bravo(id 1), charlie(id 2)
+# Returned order: id 2, id 0, id 1  ->  alpha 85, bravo 10, charlie 100
+# Mapped by position instead: alpha 100, bravo 85, charlie 10.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-score-ids.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {"review:bug-scan": {"findings": [
+     {"file":"src/alpha.js","line":11,"description":"d-alpha","category":"bug","severity":"must-fix","reason":"r0"},
+     {"file":"src/bravo.js","line":22,"description":"d-bravo","category":"bug","severity":"must-fix","reason":"r1"},
+     {"file":"src/charlie.js","line":33,"description":"d-charlie","category":"bug","severity":"must-fix","reason":"r2"}],
+    "degraded": false}},
+   "byLabelPrefix": {"score:": {"scores": [
+     {"id":2,"score":100,"rationale":"r-charlie"},
+     {"id":0,"score":85,"rationale":"r-alpha"},
+     {"id":1,"score":10,"rationale":"r-bravo"}]}}}}
+EOF
+run fanout-score-ids "$FANOUT"
+expect "fanout-score-ids: alpha (id 0) keeps its own score of 85" \
+  '[.return.findings[] | select(.file == "src/alpha.js")] | length == 1 and (.[0].score == 85)' fanout-score-ids
+expect "fanout-score-ids: alpha keeps its own rationale" \
+  '[.return.findings[] | select(.file == "src/alpha.js")][0].scoreRationale == "r-alpha"' fanout-score-ids
+expect "fanout-score-ids: charlie (id 2) keeps its own score of 100" \
+  '[.return.findings[] | select(.file == "src/charlie.js")] | length == 1 and (.[0].score == 100)' fanout-score-ids
+expect "fanout-score-ids: charlie keeps its own rationale" \
+  '[.return.findings[] | select(.file == "src/charlie.js")][0].scoreRationale == "r-charlie"' fanout-score-ids
+expect "fanout-score-ids: bravo (id 1) scored 10 and is dropped" \
+  '[.return.findings[] | select(.file == "src/bravo.js")] | length == 0' fanout-score-ids
+expect "fanout-score-ids: 3 scored, 2 survive" \
+  '.return.counts.raw == 3 and .return.counts.survived == 2' fanout-score-ids
+
+# ---------------------------------------------------------------------------
+# Case 11: the batch scorer skips a finding and invents an id that was never
+# handed to it. A skipped finding scores 0 (the same as a dead scorer); an
+# invented id must not conjure a finding that no reviewer raised.
+#
+# Given ids 0,1,2 the scorer returns only id 1 and a fabricated id 7.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-score-badids.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {"review:bug-scan": {"findings": [
+     {"file":"src/alpha.js","line":11,"description":"d-alpha","category":"bug","severity":"must-fix","reason":"r0"},
+     {"file":"src/bravo.js","line":22,"description":"d-bravo","category":"bug","severity":"must-fix","reason":"r1"},
+     {"file":"src/charlie.js","line":33,"description":"d-charlie","category":"bug","severity":"must-fix","reason":"r2"}],
+    "degraded": false}},
+   "byLabelPrefix": {"score:": {"scores": [
+     {"id":1,"score":95,"rationale":"r-bravo"},
+     {"id":7,"score":100,"rationale":"invented"}]}}}}
+EOF
+run fanout-score-badids "$FANOUT"
+expect "fanout-score-badids: the one scored finding is bravo, at 95" \
+  '[.return.findings[] | select(.file == "src/bravo.js")] | length == 1 and (.[0].score == 95)' fanout-score-badids
+expect "fanout-score-badids: the skipped findings score 0 and drop out" \
+  '[.return.findings[] | select(.file == "src/alpha.js" or .file == "src/charlie.js")] | length == 0' fanout-score-badids
+expect "fanout-score-badids: the invented id 7 adds no phantom finding" \
+  '.return.counts.raw == 3 and .return.counts.survived == 1' fanout-score-badids
+expect "fanout-score-badids: exactly one finding is returned" \
+  '(.return.findings | type) == "array" and (.return.findings | length == 1)' fanout-score-badids
+
+# ---------------------------------------------------------------------------
+# Case 12: blast radius. One dead scorer used to cost ONE finding; batched, it
+# costs that reviewer's WHOLE list. Score them all 0 (unchanged behaviour for a
+# dead scorer) and say so in degradedReviewers, so the loss is not silent.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-scorer-dead.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {"review:bug-scan": {"findings": [
+     {"file":"src/p.js","line":5,"description":"d0","category":"bug","severity":"must-fix","reason":"r0"},
+     {"file":"src/q.js","line":6,"description":"d1","category":"bug","severity":"must-fix","reason":"r1"}],
+    "degraded": false}}}}
+EOF
+run fanout-scorer-dead "$FANOUT"
+expect "fanout-scorer-dead: NO error field (the reviewer itself lived)" \
+  '.return | has("error") | not' fanout-scorer-dead
+expect "fanout-scorer-dead: exactly one scorer was attempted" \
+  '[.agents[] | select(startswith("score:"))] | length == 1' fanout-scorer-dead
+expect "fanout-scorer-dead: both findings scored 0, so none survives" \
+  '.return.counts.raw == 2 and .return.counts.survived == 0' fanout-scorer-dead
+expect "fanout-scorer-dead: the reviewer is recorded as degraded, verbatim" \
+  '.return.degradedReviewers | index("bug-scan (scorer returned no result; its findings scored 0)") != null' fanout-scorer-dead
+
+# ---------------------------------------------------------------------------
+# Case 13: the survival threshold is an ABSOLUTE cut-off at 80 and batching
+# must not move it. 80 survives; 79 does not.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-threshold.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {"review:bug-scan": {"findings": [
+     {"file":"src/at-eighty.js","line":1,"description":"d0","category":"bug","severity":"must-fix","reason":"r0"},
+     {"file":"src/at-seventynine.js","line":2,"description":"d1","category":"bug","severity":"must-fix","reason":"r1"}],
+    "degraded": false}},
+   "byLabelPrefix": {"score:": {"scores": [
+     {"id":0,"score":80,"rationale":"exactly at the cut-off"},
+     {"id":1,"score":79,"rationale":"one below the cut-off"}]}}}}
+EOF
+run fanout-threshold "$FANOUT"
+expect "fanout-threshold: a finding scored 80 survives" \
+  '[.return.findings[] | select(.file == "src/at-eighty.js")] | length == 1 and (.[0].score == 80)' fanout-threshold
+expect "fanout-threshold: a finding scored 79 does not survive" \
+  '[.return.findings[] | select(.file == "src/at-seventynine.js")] | length == 0' fanout-threshold
+expect "fanout-threshold: 2 scored, 1 survives" \
+  '.return.counts.raw == 2 and .return.counts.survived == 1' fanout-threshold
+
 echo "---"; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# workflow-behavior_test.sh — behaviour tests for .claude/workflows/review-verify.js,
-# driven by scripts/workflow-harness.js (which RUNS the workflow with stubbed agents).
+# workflow-behavior_test.sh — behaviour tests for the workflows under
+# .claude/workflows/, driven by scripts/workflow-harness.js (which RUNS the
+# workflow with stubbed agents).
+#
+# Subjects: review-verify.js and pr-review-fanout.js. Both fan agents out and
+# both must tell "nothing was wrong" apart from "every agent died".
 #
 # check-workflow-syntax.sh only parses a workflow, so it cannot see a broken
 # abort guard. These cases run the real workflow file and assert what it returns.
@@ -13,6 +17,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 HARNESS="$SCRIPT_DIR/workflow-harness.js"
 SUBJECT="$REPO_DIR/.claude/workflows/review-verify.js"
+FANOUT="$REPO_DIR/.claude/workflows/pr-review-fanout.js"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -24,7 +29,7 @@ pass=0; fail=0
 # a missing file instead of a cryptic `jq: command not found` mid-suite.
 # `[ -f ]` cannot see a binary on PATH and `command -v` is the check that can, so
 # each entry passes on either.
-for required in "$HARNESS" "$SUBJECT" jq; do
+for required in "$HARNESS" "$SUBJECT" "$FANOUT" jq; do
   if [ -f "$required" ] || command -v "$required" > /dev/null 2>&1; then
     continue
   fi
@@ -43,9 +48,9 @@ expect() { # <desc> <jq filter> <scenario-name>
   fi
 }
 
-run() { # <scenario-name> — reads $TMP/<name>.json, writes $TMP/<name>.out
-  local name="$1" rc=0
-  node "$HARNESS" "$SUBJECT" "$TMP/$name.json" > "$TMP/$name.out" 2> "$TMP/$name.err" || rc=$?
+run() { # <scenario-name> [subject] — reads $TMP/<name>.json, writes $TMP/<name>.out
+  local name="$1" subject="${2:-$SUBJECT}" rc=0
+  node "$HARNESS" "$subject" "$TMP/$name.json" > "$TMP/$name.out" 2> "$TMP/$name.err" || rc=$?
   if [ "$rc" -ne 0 ]; then
     fail=$((fail + 1))
     echo "FAIL: $name: harness exited rc=$rc — stderr: $(cat "$TMP/$name.err")"
@@ -154,6 +159,102 @@ expect "all-refuted: NO error field" '.return | has("error") | not' all-refuted
 expect "all-refuted: zero confirmed findings" \
   '(.return.confirmed | type) == "array" and (.return.confirmed | length == 0)' all-refuted
 expect "all-refuted: one finding counted as refuted" '.return.refutedCount == 1' all-refuted
+
+# ===========================================================================
+# SUBJECT 2: .claude/workflows/pr-review-fanout.js
+#
+# Same abort-guard class of defect as review-verify, with a sharper edge: this
+# workflow decides what gets posted on a real PR, so "every reviewer died"
+# reported as "the PR is clean" lets code merge unreviewed.
+# ===========================================================================
+
+# domains is empty, so the reviewer set is exactly the 5 generic reviewers.
+FARGS='{"diffPath":"/tmp/probe.diff","prNumber":7,"ownerRepo":"o/r","repoCheckout":"/tmp/co","domains":[],"claudeMdPaths":["/tmp/CLAUDE.md"]}'
+FREVIEWERS='["review:claude-md-adherence","review:bug-scan","review:git-history","review:prior-prs","review:code-comments"]'
+
+# ---------------------------------------------------------------------------
+# Case 6: every reviewer agent dies. agent() resolves null on a terminal API
+# error — it does not throw — so the pre-guard file returned
+#   {"findings":[],"degradedReviewers":[],"counts":{"raw":0,"survived":0}}
+# which a caller cannot tell from a genuinely clean PR.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-all-dead.json" <<EOF
+{"args": $FARGS, "agent": {"default": null}}
+EOF
+run fanout-all-dead "$FANOUT"
+expect "fanout-all-dead: all 5 reviewers launched, in order" \
+  ".agents == $FREVIEWERS" fanout-all-dead
+expect "fanout-all-dead: return carries the exact abort error" \
+  '.return.error == "pr-review-fanout: all 5 of 5 reviewer agent(s) died; no review ran"' fanout-all-dead
+expect "fanout-all-dead: return carries the dead count" '.return.deadReviewers == 5' fanout-all-dead
+expect "fanout-all-dead: return carries the attempted count" '.return.attemptedReviewers == 5' fanout-all-dead
+expect "fanout-all-dead: the abort reaches the log stream verbatim" \
+  '.logs | index("pr-review-fanout: all 5 of 5 reviewer agent(s) died; no review ran") != null' fanout-all-dead
+# Nothing to score when nothing was reviewed. Without this the guard could be
+# "satisfied" by a run that still burned scorer agents on a dead fan-out.
+expect "fanout-all-dead: no scorer agent ran" \
+  '[.agents[] | select(startswith("score:"))] | length == 0' fanout-all-dead
+
+# ---------------------------------------------------------------------------
+# Case 7: THE DISCRIMINATOR for invariant 2. Four reviewers die, one lives and
+# honestly reports nothing. A guard keyed on findings.length (rather than on
+# reviewers that RETURNED) would turn this clean PR into an error.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-one-live-empty.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {"review:bug-scan": {"findings": [], "degraded": false}}}}
+EOF
+run fanout-one-live-empty "$FANOUT"
+expect "fanout-one-live-empty: all 5 reviewers launched" '.agents | length == 5' fanout-one-live-empty
+expect "fanout-one-live-empty: NO error field (a live reviewer found nothing)" \
+  '.return | has("error") | not' fanout-one-live-empty
+# Assert the TYPE as well as the length: jq evaluates `null | length` to 0, so a
+# bare length check also passes when the field is ABSENT.
+expect "fanout-one-live-empty: zero findings, as a real array" \
+  '(.return.findings | type) == "array" and (.return.findings | length == 0)' fanout-one-live-empty
+expect "fanout-one-live-empty: no scorer agent ran (nothing to score)" \
+  '[.agents[] | select(startswith("score:"))] | length == 0' fanout-one-live-empty
+# Invariant 3: a dead reviewer is not an error, but it must not vanish either.
+# The caller reads degradedReviewers to know the review was not full strength.
+expect "fanout-one-live-empty: the 4 dead reviewers are recorded as degraded" \
+  '(.return.degradedReviewers | type) == "array" and (.return.degradedReviewers | length == 4)' fanout-one-live-empty
+expect "fanout-one-live-empty: a dead reviewer is named verbatim in degradedReviewers" \
+  '.return.degradedReviewers | index("git-history (agent returned no result)") != null' fanout-one-live-empty
+expect "fanout-one-live-empty: the LIVE reviewer is not marked degraded" \
+  '[.return.degradedReviewers[] | select(startswith("bug-scan"))] | length == 0' fanout-one-live-empty
+
+# ---------------------------------------------------------------------------
+# Case 8: partial failure is NOT total failure. Three reviewers die, two live,
+# and one of the live ones raises a finding that survives scoring.
+#
+# The scorer stub carries BOTH score shapes on purpose — the flat {score} the
+# per-finding scorer reads and the {scores:[{id}]} list the batch scorer reads —
+# so this abort-guard case stays valid across the scorer change and never had to
+# be rewritten to keep passing.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-partial.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {
+     "review:bug-scan": {"findings": [
+       {"file":"src/a.js","line":42,"description":"off-by-one","category":"bug","severity":"must-fix","reason":"loop overruns"}],
+      "degraded": false},
+     "review:code-comments": {"findings": [], "degraded": false}},
+   "byLabelPrefix": {"score:": {"score": 90, "rationale": "real",
+                                "scores": [{"id": 0, "score": 90, "rationale": "real"}]}}}}
+EOF
+run fanout-partial "$FANOUT"
+expect "fanout-partial: NO error field (2 of 5 reviewers returned)" \
+  '.return | has("error") | not' fanout-partial
+expect "fanout-partial: the finding from the live reviewer survives" \
+  '(.return.findings | type) == "array" and (.return.findings | length == 1)' fanout-partial
+expect "fanout-partial: the survivor is the injected finding" \
+  '.return.findings[0].file == "src/a.js" and .return.findings[0].line == 42 and .return.findings[0].score == 90' fanout-partial
+expect "fanout-partial: exactly the 3 dead reviewers are degraded" \
+  '(.return.degradedReviewers | sort) == ["claude-md-adherence (agent returned no result)","git-history (agent returned no result)","prior-prs (agent returned no result)"]' fanout-partial
+expect "fanout-partial: counts reflect the one scored finding" \
+  '.return.counts.raw == 1 and .return.counts.survived == 1' fanout-partial
 
 echo "---"; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

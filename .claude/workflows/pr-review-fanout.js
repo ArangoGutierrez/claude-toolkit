@@ -213,6 +213,28 @@ log(`pr-review-fanout: ${reviewers.length} reviewer(s) (${genericReviewers.lengt
 
 const degradedReviewers = []
 
+// Abort guard (2026-07-31), mirroring the one in review-verify.js. `agent()` resolves to
+// null when an agent dies — it does not throw — so without this counter a run where every
+// reviewer died is indistinguishable from a PR with nothing wrong. The `.catch()` below
+// cannot stand in for it: that only ever fires on an unregistered agentType, never on a
+// rate limit or a terminal API error, which both arrive as a resolved null.
+// INVARIANT:
+//   1. when EVERY reviewer returns null, the return value carries a truthy `error` plus
+//      `deadReviewers` and `attemptedReviewers`, which are COUNTS — unlike the
+//      `degradedReviewers` list of names alongside them;
+//   2. when at least one reviewer RETURNS A RESULT, the return value carries no `error`,
+//      even if that result has zero findings, and even if every finding it did raise
+//      scores below the survival threshold;
+//   3. partial failure is NOT total failure: some reviewers dead and some alive carries
+//      no `error`. Each dead reviewer lands in `degradedReviewers` instead, so the caller
+//      can still see the review ran below full strength.
+// `liveReviewers` counts reviewers that returned an object, NOT reviewers that found
+// something. That distinction is the whole guard: keying on findings.length would turn
+// every clean PR into an error. The count increments in stage 1, where the null
+// originates, so the guard does not depend on whether pipeline runs stage 2 for a
+// null-valued item.
+let liveReviewers = 0
+
 // The specialist agent types come from ~/.claude/agents/. The terminal CLI scans
 // that directory; the SDK/desktop host populates its registry from the SDK
 // `agents` option instead, so an unregistered type throws and pipeline() would
@@ -224,11 +246,17 @@ const results = await pipeline(
   reviewers,
   (r) => {
     const base = { label: `review:${r.name}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: 'sonnet' }
-    if (!r.agentType) return agent(r.prompt, base)
-    return agent(r.prompt, { ...base, agentType: r.agentType }).catch((e) => {
-      if (!/agent type .* not found/i.test(String((e && e.message) || e))) throw e
-      degradedReviewers.push(`${r.name} (agent type "${r.agentType}" not registered on this host — ran as general-purpose)`)
-      return agent(r.prompt, { ...base, agentType: 'general-purpose' })
+    const attempt = !r.agentType
+      ? agent(r.prompt, base)
+      : agent(r.prompt, { ...base, agentType: r.agentType }).catch((e) => {
+        if (!/agent type .* not found/i.test(String((e && e.message) || e))) throw e
+        degradedReviewers.push(`${r.name} (agent type "${r.agentType}" not registered on this host — ran as general-purpose)`)
+        return agent(r.prompt, { ...base, agentType: 'general-purpose' })
+      })
+    return attempt.then((review) => {
+      if (review) liveReviewers++
+      else degradedReviewers.push(`${r.name} (agent returned no result)`)
+      return review
     })
   },
   (review, r) => {
@@ -258,8 +286,21 @@ log(
   (degradedReviewers.length ? `; degraded reviewers: ${degradedReviewers.join(', ')}` : ''),
 )
 
-return {
+const out = {
   findings: survivors,
   degradedReviewers,
   counts: { raw: scored.length, survived: survivors.length },
 }
+// `reviewers.length > 0` is DEFENSIVE ONLY — it cannot be false today.
+// genericReviewers is a literal of 5 entries and specialists only add to it, so
+// `reviewers` always has at least 5 members here. Keep the check so a future
+// path that legitimately runs zero reviewers cannot report "all 0 of 0 reviewer
+// agent(s) died", but do not read it as reachable today.
+if (reviewers.length > 0 && liveReviewers === 0) {
+  const deadReviewers = reviewers.length - liveReviewers
+  out.error = `pr-review-fanout: all ${deadReviewers} of ${reviewers.length} reviewer agent(s) died; no review ran`
+  out.deadReviewers = deadReviewers
+  out.attemptedReviewers = reviewers.length
+  log(out.error)
+}
+return out

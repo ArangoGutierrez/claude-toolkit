@@ -43,6 +43,13 @@ if printf 'Bash\tgolangci-lint run\n'| verification_ran; then ok "verify: golang
 if printf 'Bash\tls -la /repo\n'     | verification_ran; then bad "verify: 'ls' wrongly counted"; else ok "verify: 'ls' is not verification"; fi
 # Override: a custom pattern detects a custom command.
 if printf 'Bash\tmycheck --all\n'    | VERIFY_GATE_PATTERN='mycheck' verification_ran; then ok "verify: VERIFY_GATE_PATTERN override"; else bad "verify: pattern override ignored"; fi
+# This repo's own runners. Without their literals the gate blocked immediately
+# after a real `run-evals.sh` / `check-workflow-syntax.sh` run — the bug these catch.
+if printf 'Bash\tbash scripts/run-evals.sh\n'             | verification_ran; then ok "verify: run-evals.sh detected"; else bad "verify: run-evals.sh not detected"; fi
+if printf 'Bash\tbash scripts/check-workflow-syntax.sh\n' | verification_ran; then ok "verify: check-workflow-syntax.sh detected"; else bad "verify: check-workflow-syntax.sh not detected"; fi
+# Discriminator: a sibling .sh runner that is NOT verification must stay unmatched,
+# so a lazily-broadened pattern (e.g. a bare `\.sh`) fails here.
+if printf 'Bash\tbash scripts/deploy.sh\n'                | verification_ran; then bad "verify: 'deploy.sh' wrongly counted"; else ok "verify: 'deploy.sh' is not verification"; fi
 
 # ── Task 4: main() end-to-end ─────────────────────────────────────────────────
 mk_block() { # .go Edit + a NON-verify Bash (ls)

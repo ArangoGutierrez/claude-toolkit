@@ -25,6 +25,9 @@ jobs:
       - name: Docs-generator harness
         run: bash scripts/gen-workflow-docs_test.sh
 
+      - name: Workflow behaviour harness
+        run: bash scripts/workflow-behavior_test.sh
+
       - name: Regenerate the workflow table
         run: bash scripts/gen-workflow-docs.sh
 

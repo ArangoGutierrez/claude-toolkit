@@ -33,23 +33,6 @@ per day.
 ]
 ```
 
-## `verify-gate.sh` — Stop verification gate
-
-Blocks a session **once** when code changed this session but no test/build/lint
-command ran. Fail-open on any error; escape hatch `export VERIFY_GATE=off`. See
-[`verify-gate.README.md`](verify-gate.README.md) for the full contract and
-overrides.
-
-```json
-"Stop": [
-  {
-    "hooks": [
-      { "type": "command", "command": "$HOME/.claude/hooks/verify-gate.sh" }
-    ]
-  }
-]
-```
-
 ## `budget-governor.sh` — Stop token-budget advisory
 
 On Stop, sums output tokens across the session transcript (and any subagent
@@ -85,6 +68,5 @@ its own directory, so it runs from a checkout or a worktree:
 
 ```sh
 bash .claude/hooks/bash-audit-log_test.sh < /dev/null
-bash .claude/hooks/verify-gate_test.sh   < /dev/null
 bash .claude/hooks/budget-governor_test.sh < /dev/null
 ```

@@ -188,14 +188,6 @@
             "command": "$HOME/.claude/hooks/context-watch.sh"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/verify-gate.sh"
-          }
-        ]
       }
     ],
     "PermissionDenied": [

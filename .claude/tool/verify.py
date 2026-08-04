@@ -27,7 +27,7 @@ _DENY_GIT_SUBCMDS = {
 # git global options that consume the NEXT token, so it is a value and not the
 # subcommand. Needed to read `git -C <dir> clean -fdx` correctly.
 _GIT_VALUE_OPTS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace",
-                   "--exec-path", "--super-prefix"}
+                   "--exec-path", "--super-prefix", "--attr-source"}
 # Shell operators treated as standalone tokens when UNQUOTED. A metacharacter
 # inside a quoted argument (e.g. the ';' in `python3 -c "import x; y"`) stays
 # part of its token and is NOT flagged.
@@ -76,18 +76,21 @@ def _git_violation(seg: list[str], i: int) -> str | None:
     `alias.z=clean -fdx`, and the subcommand is inside a quoted token where no
     token scan can see it."""
     rest = seg[i + 1:]
-    for tok in rest:
-        if tok.startswith("alias."):
-            return "git alias definition"
     j = 0
     while j < len(rest):
         tok = rest[j]
-        if tok.startswith("-"):
-            j += 2 if tok in _GIT_VALUE_OPTS else 1
-            continue
-        # the first NON-option token is the subcommand; a denied word appearing
-        # later is a search term or a ref, not an invocation
-        return f"denied git subcommand {tok!r}" if tok in _DENY_GIT_SUBCMDS else None
+        if not tok.startswith("-"):
+            # the first NON-option token is the subcommand; a denied word later
+            # is a search term or a ref, not an invocation
+            return f"denied git subcommand {tok!r}" if tok in _DENY_GIT_SUBCMDS else None
+        # Everything from here to the subcommand is a GIT option. Deny the
+        # whole config-override mechanism rather than one key name: config keys
+        # are case-INSENSITIVE, and several of them run their value as a
+        # command (core.pager, core.fsmonitor, diff.external, core.sshCommand),
+        # so `-c alias.` is only one route of many.
+        if tok == "-c" or tok.lower().startswith("--config-env"):
+            return "git config override"
+        j += 2 if tok in _GIT_VALUE_OPTS else 1
     return None
 
 

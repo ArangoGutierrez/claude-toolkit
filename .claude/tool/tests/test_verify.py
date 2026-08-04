@@ -132,15 +132,42 @@ def test_denylist_rejects_git_subcommand_behind_an_option():
     assert denylisted_reason("git -C /tmp/x clean -fdx") == "denied git subcommand 'clean'"
     assert denylisted_reason("git --git-dir=x push") == "denied git subcommand 'push'"
     assert denylisted_reason("git --no-pager reset --hard") == "denied git subcommand 'reset'"
-    assert denylisted_reason("git -c a=b commit -m z") == "denied git subcommand 'commit'"
+    # '-c' is now denied as a mechanism, BEFORE the subcommand is even read,
+    # so this input is still rejected and for a broader reason
+    assert denylisted_reason("git -c a=b commit -m z") == "git config override"
     assert denylisted_reason("git.exe push") == "denied git subcommand 'push'"
+
+def test_denylist_rejects_the_whole_config_override_mechanism():
+    # INVARIANT: '-c'/'--config-env' BEFORE the subcommand is denied outright.
+    # Guarding the key name 'alias.' is not enough -- git config keys are
+    # case-INSENSITIVE, and several non-alias keys run their value as a
+    # command (core.pager, core.fsmonitor, diff.external, core.sshCommand).
+    assert denylisted_reason("git -c ALIAS.z='clean -fdx' z") == "git config override"
+    assert denylisted_reason("git -c Alias.z=clean z") == "git config override"
+    assert denylisted_reason("git -c core.fsmonitor='rm -rf work.txt' status") == "git config override"
+    assert denylisted_reason("git -c alias.z='clean -fdx' z") == "git config override"
+    assert denylisted_reason("git --config-env=alias.z=ZV z") == "git config override"
+    assert denylisted_reason("ZV='clean -fdx' git --config-env=alias.z=ZV z") == "git config override"
+
+def test_denylist_allows_dash_c_belonging_to_a_subcommand():
+    # after the subcommand, '-c' is the SUBCOMMAND's flag, not git's config
+    # override, so denying it there would break a read-only check
+    assert denylisted_reason("git grep -c foo") is None
+    assert denylisted_reason("git shortlog -c") is None
+
+def test_denylist_skips_the_value_of_attr_source():
+    # --attr-source consumes the NEXT token, so without it in the skip set the
+    # subcommand is misread and 'clean -fdx' runs
+    assert denylisted_reason("git --attr-source HEAD clean -fdx") == "denied git subcommand 'clean'"
+
 
 def test_denylist_rejects_git_alias_smuggling():
     # the subcommand hides inside a QUOTED token, so scanning tokens never sees
-    # it; `git -c alias.z='clean -fdx' z` really does delete files
-    assert denylisted_reason("git -c alias.z='clean -fdx' z") == "git alias definition"
-    assert denylisted_reason("git -c alias.p=push p") == "git alias definition"
-    assert denylisted_reason("git config --get alias.push") == "git alias definition"
+    # it; `git -c alias.z='clean -fdx' z` really does delete files. The whole
+    # -c mechanism is denied, so the reason names the mechanism.
+    assert denylisted_reason("git -c alias.p=push p") == "git config override"
+    # reached as a subcommand instead, `config` is itself denied
+    assert denylisted_reason("git config --get alias.push") == "denied git subcommand 'config'"
 
 def test_denylist_rejects_destructive_read_family():
     # a five-word denylist missed the whole restore/checkout family;

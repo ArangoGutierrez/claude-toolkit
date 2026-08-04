@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -uo pipefail
-# Per-repo: ff fork's default branch from upstream, conditionally rebase
-# agents-workbench (clean + conflict-free only), refresh the graph, symlink the
-# graph into worktrees. Emits one status line. Never fatal on one repo. 2026.
+# Per-repo: ff fork's default branch from upstream, autostash-rebase
+# agents-workbench (dirty WIP is stashed, replayed, and restored either way),
+# refresh the graph, symlink the graph into worktrees. Emits one status line.
+# Never fatal on one repo. 2026.
 
 REPO="${1:?usage: graphify-sync-repo.sh <repo-path>}"
 cd "$REPO" 2>/dev/null || { echo "$REPO | ERROR:not-a-dir"; exit 0; }
@@ -18,7 +19,6 @@ default_branch(){
   for b in master main; do git show-ref --verify --quiet "refs/remotes/upstream/$b" && { printf '%s\n' "$b"; return; }; done
 }
 branch_exists(){ git show-ref --verify --quiet "refs/heads/$1"; }
-tree_clean(){ git diff --quiet && git diff --cached --quiet; }
 op_in_progress(){ [ -d "$(git rev-parse --git-path rebase-merge)" ] || [ -d "$(git rev-parse --git-path rebase-apply)" ] || [ -f "$(git rev-parse --git-path MERGE_HEAD)" ]; }
 
 if has_upstream; then
@@ -34,11 +34,28 @@ if has_upstream; then
       if git fetch upstream "$DEF:$DEF" >/dev/null 2>&1; then ff="OK"; else ff="DIVERGED"; fi
     fi
     if branch_exists agents-workbench; then
-      if [ "$CUR" = "agents-workbench" ] && tree_clean && ! op_in_progress; then
-        if git rebase "$DEF" >/dev/null 2>&1; then reb="CLEAN"; else git rebase --abort >/dev/null 2>&1; reb="CONFLICT"; fi
+      if [ "$CUR" = "agents-workbench" ] && ! op_in_progress; then
+        # --autostash stashes any dirty tree before rebasing and re-applies it
+        # after. Three outcomes, all verified on git 2.50.1 (Apple Git-155):
+        #   rc=0, no conflict marker  -> WIP absent or re-applied cleanly.
+        #   rc=0, conflict marker     -> commits replayed fine, but the
+        #     stash re-apply left unmerged (UU) entries; the stash itself
+        #     survives. An unattended job can't leave a mid-conflict tree,
+        #     so reset --hard it away (the stash entry survives the reset).
+        #   rc!=0                     -> the commit replay itself conflicted;
+        #     abort restores agents-workbench's SHA and re-applies the WIP.
+        out="$(LC_ALL=C git rebase --autostash "$DEF" 2>&1)"; rc=$?
+        if [ "$rc" -eq 0 ]; then
+          case "$out" in
+            *"Applying autostash resulted in conflicts"*) git reset --hard >/dev/null 2>&1; reb="CLEAN:WIP-STASHED" ;;
+            *) reb="CLEAN" ;;
+          esac
+        else
+          git rebase --abort >/dev/null 2>&1
+          reb="CONFLICT"
+        fi
         behind="$(git rev-list --count "HEAD..$DEF" 2>/dev/null || echo 0)"
       elif [ "$CUR" != "agents-workbench" ]; then reb="SKIP:not-on-aw"
-      elif ! tree_clean; then reb="SKIP:dirty"
       else reb="SKIP:op-in-progress"; fi
     fi
   fi

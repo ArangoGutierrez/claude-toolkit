@@ -84,8 +84,17 @@ These scripts automate refreshing graphs over time so they don't go stale:
   weekly `launchd` agent that runs the fleet sync on a schedule.
 - **`scripts/graphify-sync-all.sh`** and **`scripts/graphify-sync-repo.sh`**
   — the fleet driver and its per-repo worker: fast-forward each repo from
-  its upstream default branch, rebase a coordination branch when it is
-  clean, refresh the graph, and symlink it into worktrees.
+  its upstream default branch, autostash-rebase a coordination branch,
+  refresh the graph, and symlink it into worktrees. The rebase always runs
+  (uncommitted work no longer blocks it): dirty changes are stashed, the
+  branch is replayed onto the new default branch, and the stash is
+  reapplied. Three outcomes: `rebase:CLEAN` (no WIP, or it reapplied
+  cleanly), `rebase:CLEAN:WIP-STASHED` (the rebase itself succeeded but the
+  WIP reapply conflicted, so the tree is reset and the WIP is left parked
+  in `git stash` for manual recovery), or `rebase:CONFLICT` (the rebase
+  itself conflicted and was aborted, restoring the branch and the WIP
+  exactly as they were). The fleet driver flags both `CLEAN:WIP-STASHED`
+  and `CONFLICT` repos as needing manual attention.
 
 ## Trust boundary
 

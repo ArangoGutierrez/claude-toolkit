@@ -82,8 +82,13 @@ Plan goes to `.agents/plans/<project-name>.md`. Required sections:
 3. **Risk Register** — table: Risk, Likelihood, Impact, Mitigation
 4. **Wave Plan** — if >3 tasks, groupings with rationale
 5. **Branch Strategy** — one of: per-task (default), shared feature branch, single branch
-6. **Dependencies Map** — explicit deps or "all independent"
-7. **Success Criteria** — bullet list of "done" conditions
+6. **Dependencies Map** — explicit `deps` or "all independent"
+7. **Path Ownership** — each task's `owns`: the glob list of paths that task may
+   change. One owner per path, no two tasks overlapping. A `**` glob covers a
+   subtree; a bare path names one file. Everything a task does not own is out of
+   scope for it. Compare `owns` against `git diff --name-only <base>...HEAD` to
+   check that a task stayed inside its scope.
+8. **Success Criteria** — bullet list of "done" conditions
 
 ## 6. Branch Sync Validation (Pre-flight)
 

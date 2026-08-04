@@ -15,8 +15,8 @@ through if PRs are still open — it warns and asks for confirmation instead.
   `.worktrees/<feature>` directory, and updates `AGENTS.md` with final status.
 - You're about to start a new team engagement and need the previous one's
   agents, worktrees, and context out of the way first.
-- You want context hygiene (`/compact`) run right after cleanup so the
-  finished team's context doesn't carry into the next task.
+- You want the finished team's context out of the way before the next task
+  (start a fresh session or `/handoff`; no manual `/compact` step is needed).
 - **Not for:** cleanup while PRs are still open for review — that's still
   `/team-execute`'s review cycle; `team-shutdown` warns rather than force-
   closing work in progress.
@@ -37,13 +37,13 @@ through if PRs are still open — it warns and asks for confirmation instead.
 
 ## Notes
 
-- Two entry points, one workflow: the slash command
-  (`.claude/commands/team-shutdown.md`) is how you invoke this directly; the
-  skill (`.claude/skills/team-shutdown/SKILL.md`) carries the same procedure
-  so the agent can trigger it automatically once it recognizes a team is done.
+- The `/team-shutdown` slash name is provided by this skill
+  (`.claude/skills/team-shutdown/SKILL.md`); invoke it directly, or let the
+  agent trigger it automatically once it recognizes a team is done.
 - Order matters: TeamDelete runs before worktree removal, never after —
   leftover team infrastructure wastes resources and pollutes context.
-- Final step is `/compact Focus on next task` for context hygiene.
+- Final step: move on with a fresh session or `/handoff` — context is
+  auto-summarized as it grows, so no manual `/compact` step is required.
 - Related: [`team-plan`](../team-plan/) plans the work,
   [`team-execute`](../team-execute/) runs it, `team-shutdown` closes it out;
   [`worktree-guide`](../worktree-guide/) explains the agents-workbench model.

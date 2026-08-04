@@ -83,51 +83,21 @@ These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each h
 
 The engine-backed skills — `/kickoff`, `/done`, and `/validate-recommendation` — share one agentic engine under `.claude/tool/` (its provider seam is `tool.backends`); their `KICKOFF_*` / `DONE_*` env vars and the panel `config.yml` choose the backend and model. `/done` is procedure-only — its `SKILL.md` and `eval.py`, without a standalone README yet — so its row links the `SKILL.md`.
 
-The three `team-*` skills are also exposed as slash commands in `.claude/commands/`. Note the two copies have drifted: the command files predate the skills' current form (they still use the "Distinguished Systems Engineer" role name and `team/lib/architect-*.md` reference paths, where the skills use "Principal Engineer" and `.claude/agents/*.md`). The SKILL.md trio is the source of truth for the process; reconciling the command copies is a tracked follow-up. The next section documents the commands as they currently exist.
+The `/team-plan`, `/team-execute`, and `/team-shutdown` slash names are defined solely by the three `team-*` skills listed above. Earlier copies of these commands also lived in `.claude/commands/`, but those copies drifted from the skills and have been removed — the skills are now the single source of truth for the team workflow. The reference material the workflow draws on is listed below.
 
 ---
 
-## Claude Code Team Commands
+## Team Reference Material
 
-These are slash commands in `.claude/commands/` that coordinate multi-agent team workflows. They are invoked as `/team-plan`, `/team-execute`, and `/team-shutdown`. Each command defines a phase of the team lifecycle. (The command files lag the `team-*` skills — see the note in the previous section; the per-skill READMEs describe the current process.)
+The `team-*` skills above coordinate multi-agent implementation. Shared reference material lives under `.claude/team/lib/` — retained for reference; nothing currently loads or references it automatically. For the team structure, roles, and communication protocol, see the per-skill READMEs linked in the skills table above.
 
-### Team Structure
-
-All three commands share the same team structure:
-
-- **Team Lead (you):** Coordinates from the `agents-workbench` branch. Does not make technical decisions.
-- **Distinguished Systems Engineer:** Senior technical authority. Makes architectural decisions, reviews PRs for architecture/security violations, triages external review bot comments. Reads from `team/lib/architect-*.md` reference material. Location: `agents-workbench` (read-only).
-- **QA Agent:** Validates implementations against CI pipelines, verifies quality gates, blocks merges if issues found. Only agent authorized to promote draft PRs to ready-for-review (`gh pr ready`). Location: `agents-workbench` (read-only).
-- **Workers (1–3):** Implement tasks following TDD in dedicated worktrees. Escalate design decisions to Distinguished Engineer. Create draft PRs only. Report to QA when ready for testing.
-
-Team size is capped at 5 spawned agents (1 Distinguished Engineer + 1 QA + up to 3 Workers). For more than 3 tasks, work is organized in waves — Distinguished Engineer and QA persist across waves while Workers rotate.
-
-### Commands
-
-| Command | Phase | Purpose |
-|---------|-------|---------|
-| `/team-plan` | Planning | Validates branch source, brainstorms approach (≥3 options), decomposes work into scored tasks, chooses branching strategy, writes structured plan to `.agents/plans/`, updates `AGENTS.md` |
-| `/team-execute` | Execution | Creates worktrees, spawns agents in mandatory order (Distinguished Engineer → QA → Workers), coordinates TDD implementation, manages draft PR → QA validation → Distinguished Engineer review → merge cycle |
-| `/team-shutdown` | Shutdown | Verifies all PRs merged, runs TeamDelete to shut down agents, removes worktrees, updates `AGENTS.md` with final status, runs context cleanup |
-
-### Communication Protocol
-
-- **Workers → Distinguished Engineer:** Design decisions (present ≥3 options with trade-offs)
-- **Workers → QA:** Ready for testing (feature name, summary, test status, draft PR URL)
-- **QA → Distinguished Engineer:** Quality issues requiring design changes
-- **Distinguished Engineer → Workers:** Consolidated review feedback (own review + triaged external bot comments)
-
-### Supporting Files
-
-The team commands depend on reference material in `.claude/team/`:
-
-| File | Used By | Purpose |
+| File | Used by | Purpose |
 |------|---------|---------|
-| `team/lib/planning-guide.md` | `/team-plan` | Task decomposition methodology and wave construction rules |
-| `team/lib/branch-validator.md` | `/team-plan`, `/team-execute` | Validates branch source is up-to-date before creating worktrees |
-| `team/lib/qa-validator.md` | QA Agent | Full validation checklist: git signatures, language checks, CI replication, PR metadata |
-| `team/lib/decision-template.md` | Distinguished Engineer | ADR template for recording architectural decisions |
-| `team/lib/architect-*.md` (7 files) | Distinguished Engineer | Reference material covering patterns, security, distributed systems, infrastructure, observability, decisions, validation |
+| `team/lib/planning-guide.md` | `team-plan` skill | Task decomposition methodology and wave construction rules |
+| `team/lib/branch-validator.md` | `team-plan`, `team-execute` skills | Validates branch source is up-to-date before creating worktrees |
+| `team/lib/qa-validator.md` | QA Engineer | Full validation checklist: git signatures, language checks, CI replication, PR metadata |
+| `team/lib/decision-template.md` | Principal Engineer | ADR template for recording architectural decisions |
+| `team/lib/architect-*.md` (7 files) | Principal Engineer | Reference material covering patterns, security, distributed systems, infrastructure, observability, decisions, validation |
 
 ---
 

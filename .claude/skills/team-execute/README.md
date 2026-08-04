@@ -50,8 +50,8 @@ startup live in `.claude/agents/principal-engineer.md` and
 - Workers are forbidden from running `gh pr ready` — only QA promotes a draft
   PR, and only after its review cycle (QA validation, Principal Engineer
   review, external bot triage) fully passes.
-- This workflow has two entry points that should stay in sync: the
-  `/team-execute` slash command and this auto-triggerable skill.
+- The `/team-execute` slash name is provided by this skill, which the agent
+  can also trigger automatically.
 - Related: [`team-plan`](../team-plan/) (writes the plan this skill consumes),
   [`team-shutdown`](../team-shutdown/) (tears down agents and worktrees when
   done), [`worktree-guide`](../worktree-guide/) (the agents-workbench branch

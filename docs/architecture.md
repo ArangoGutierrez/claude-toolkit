@@ -376,7 +376,7 @@ Worktrees are developer-local working directories, not project artifacts. Their 
 
 ## 7. Team Library Reference
 
-The `.claude/team/` directory contains reference material used by the Principal Engineer agent during multi-agent team workflows (`/team-plan`, `/team-execute`, `/team-shutdown`).
+The `.claude/team/` directory is retained as reference material for the multi-agent team workflows defined by the `team-*` skills (`/team-plan`, `/team-execute`, `/team-shutdown`). It is documentation those workflows can draw on; no agent loads it automatically.
 
 The `team/lib/` subdirectory holds 11 files organized by concern:
 
@@ -387,7 +387,7 @@ The `team/lib/` subdirectory holds 11 files organized by concern:
 - **Observability:** `architect-observability.md` (metrics/logs/traces, SLI/SLO, alerting patterns, OpenTelemetry)
 - **Quality:** `qa-validator.md` (validation checklist for git signatures, language checks, CI replication, PR metadata)
 
-The Principal Engineer reads these libraries at team startup and consults them when Workers escalate design decisions. The QA Engineer reads `qa-validator.md` to run its validation checklist. This material is what gives the team agents domain-specific knowledge beyond their base capabilities.
+These files document domain-specific knowledge for the team workflow — the `architect-*.md` design guidance, `qa-validator.md`'s validation checklist, and the planning and decision templates — beyond an agent's base capabilities. They are retained for reference; nothing currently loads or references them automatically.
 
 ---
 

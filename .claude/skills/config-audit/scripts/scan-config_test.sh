@@ -177,5 +177,53 @@ printf 'password="hunter2longvalue1234567890"; helper(x)\n' > "$TRAIL/tool/trail
 OUTTRAIL=$(bash "$SCAN" "$TRAIL" 2>/dev/null)
 if echo "$OUTTRAIL" | grep secrets | grep -q "trail.py"; then echo "PASS: trailing call does not suppress a preceding secret"; PASS=$((PASS+1)); else echo "FAIL: trailing call suppressed a preceding secret: $OUTTRAIL"; FAIL=$((FAIL+1)); fi
 
+# ---- missing dir must fail closed: nothing scanned -> exit 3 (issue #20 defect b) ----
+# A non-existent scan target previously exited 0, letting a broken invocation
+# report "clean". It must abort with code 3 and say nothing was scanned.
+MISSDIR="$TMP/does-not-exist-$$"
+MDERR="$TMP/missdir.err"
+bash "$SCAN" "$MISSDIR" >/dev/null 2>"$MDERR"; RCMD=$?
+if [ "$RCMD" -eq 3 ]; then echo "PASS: missing dir exits abort code 3 (rc=$RCMD)"; PASS=$((PASS+1)); else echo "FAIL: missing dir did not exit 3, got rc=$RCMD"; FAIL=$((FAIL+1)); fi
+if grep -qi "nothing scanned" "$MDERR"; then echo "PASS: missing dir stderr says nothing scanned"; PASS=$((PASS+1)); else echo "FAIL: missing dir stderr lacks 'nothing scanned': $(cat "$MDERR")"; FAIL=$((FAIL+1)); fi
+
+# ---- add() append failure must fail closed: never exit 0 (issue #20 defect a) ----
+# Shim mktemp to return a real but unwritable (mode 000) findings buffer: the
+# mktemp gate passes (file exists) but every add() append fails. Previously the
+# failure was silent and the empty buffer reported "clean" (exit 0). It must
+# abort with code 3 and emit scan-config's own diagnostic. PATH-shim so the
+# discriminator holds in both sandboxed and unsandboxed environments.
+ADDFAILBIN="$TMP/addfailbin"; mkdir -p "$ADDFAILBIN"
+cat > "$ADDFAILBIN/mktemp" <<ADDSHIM
+#!/bin/bash
+f=\$(/usr/bin/mktemp "$TMP/addfail.XXXXXX")
+chmod 000 "\$f"
+echo "\$f"
+ADDSHIM
+chmod +x "$ADDFAILBIN/mktemp"
+ADDERR="$TMP/addfail.err"
+PATH="$ADDFAILBIN:$PATH" bash "$SCAN" "$DIRTY" >/dev/null 2>"$ADDERR"; RCADD=$?
+if [ "$RCADD" -eq 3 ]; then echo "PASS: add() append failure exits abort code 3 (rc=$RCADD)"; PASS=$((PASS+1)); else echo "FAIL: add() append failure did not exit 3, got rc=$RCADD"; FAIL=$((FAIL+1)); fi
+# assert scan-config's OWN "scan-config:"-prefixed diagnostic (bash's redirect
+# error is prefixed with the script path, so this discriminates the fix from
+# the silent-fail mutant that only lets bash's stderr through)
+if grep -q "^scan-config:" "$ADDERR"; then echo "PASS: add() append failure prints scan-config's own diagnostic"; PASS=$((PASS+1)); else echo "FAIL: add() append failure produced no scan-config diagnostic: $(cat "$ADDERR")"; FAIL=$((FAIL+1)); fi
+
+# ---- value-scoped suppression: a benign kw=value must not blind a real secret
+# literal elsewhere on the same line (issue #20 defect c). The three secrets
+# exclusions (dotted-chain / ALL_CAPS constant / identifier-call) previously
+# `continue`d the whole line, so a real credential sharing the line went unseen. ----
+VS="$TMP/valuescope"; mkdir -p "$VS"
+printf 'token=a.b.c; password="0123456789abcdef0123"\n'                                 > "$VS/dotted.md"
+printf 'api_key=MY_CONST_NAME; secret="0123456789abcdef0123"\n'                         > "$VS/allcaps.md"
+printf 'token=getToken(); password="0123456789abcdef0123"\n'                            > "$VS/call.md"
+printf 'token=a.b.c; password="0123456789abcdef0123"   # config-audit:ignore secrets\n' > "$VS/marked.md"
+printf 'token=config.auth.token_value\n'                                                > "$VS/benign.md"
+OUTVS=$(bash "$SCAN" "$VS" 2>/dev/null)
+if echo "$OUTVS" | grep secrets | grep -q "dotted.md";  then echo "PASS: compound dotted-chain + real secret flagged"; PASS=$((PASS+1)); else echo "FAIL: compound dotted-chain secret blinded: $OUTVS"; FAIL=$((FAIL+1)); fi
+if echo "$OUTVS" | grep secrets | grep -q "allcaps.md"; then echo "PASS: compound ALL_CAPS + real secret flagged"; PASS=$((PASS+1)); else echo "FAIL: compound ALL_CAPS secret blinded: $OUTVS"; FAIL=$((FAIL+1)); fi
+if echo "$OUTVS" | grep secrets | grep -q "call.md";    then echo "PASS: compound identifier-call + real secret flagged"; PASS=$((PASS+1)); else echo "FAIL: compound identifier-call secret blinded: $OUTVS"; FAIL=$((FAIL+1)); fi
+if echo "$OUTVS" | grep secrets | grep -q "marked.md";  then echo "FAIL: marker did not suppress compound secret: $OUTVS"; FAIL=$((FAIL+1)); else echo "PASS: suppression marker still suppresses value-scoped compound line"; PASS=$((PASS+1)); fi
+if echo "$OUTVS" | grep secrets | grep -q "benign.md";  then echo "FAIL: benign-only excluded value flagged as secret: $OUTVS"; FAIL=$((FAIL+1)); else echo "PASS: benign-only excluded value not flagged"; PASS=$((PASS+1)); fi
+
 echo "==== Results: $PASS passed, $FAIL failed ===="
 [ "$FAIL" -eq 0 ]

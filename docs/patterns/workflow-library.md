@@ -16,6 +16,7 @@ script as structured `args`.
 | Workflow | Invoke | Purpose |
 |---|---|---|
 | `chief-dispatch` | `/chief-dispatch` | Run task briefs through builder agents with an adversarial critic gate and one bounded fix round |
+| `pr-review-fanout` | `/pr-review-fanout` | Reviewer fan-out + per-finding confidence scoring for the /pr-review skill |
 | `review-verify` | `/review-verify` | Review a diff or path across dimensions, then adversarially verify every finding |
 | `weekly-audit` | `/weekly-audit` | Parallel repo hygiene sweep — config audit, eval suite, docs drift, dead references — synthesized into one report |
 <!-- workflow-table:end -->

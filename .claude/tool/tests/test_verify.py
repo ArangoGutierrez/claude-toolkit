@@ -137,6 +137,35 @@ def test_denylist_rejects_git_subcommand_behind_an_option():
     assert denylisted_reason("git -c a=b commit -m z") == "git config override"
     assert denylisted_reason("git.exe push") == "denied git subcommand 'push'"
 
+def test_denylist_rejects_config_override_through_the_environment():
+    # git reads GIT_CONFIG_COUNT/KEY_n/VALUE_n, so the override needs no '-c'
+    # at all. This form deleted a worktree while reporting 'passes'.
+    assert denylisted_reason(
+        "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=alias.z GIT_CONFIG_VALUE_0='clean -fdx' git z"
+    ) == "git config override through the environment"
+    assert denylisted_reason(
+        "GIT_CONFIG_KEY_0=core.fsmonitor GIT_CONFIG_VALUE_0='rm -rf w' git status"
+    ) == "git config override through the environment"
+
+def test_denylist_rejects_environment_that_redirects_code_resolution():
+    assert denylisted_reason("PATH=/tmp/evil:$PATH git zzz") == "environment redirects code resolution"
+    assert denylisted_reason("DYLD_INSERT_LIBRARIES=/tmp/x.dylib make test") == "environment redirects code resolution"
+
+def test_denylist_rejects_git_exec_path():
+    # --exec-path relocates where git finds its subcommand binaries
+    assert denylisted_reason("git --exec-path=/tmp/evil zzz") == "git exec-path override"
+    assert denylisted_reason("git --exec-path /tmp/evil zzz") == "git exec-path override"
+
+def test_denylist_only_treats_git_as_git_in_command_position():
+    # 'git' as an ARGUMENT to another command is not a git invocation;
+    # `grep git -c README.md` was wrongly rejected as a config override
+    assert denylisted_reason("grep git -c README.md") is None
+    assert denylisted_reason("echo git -c foo") is None
+    # ...but a wrapper still resolves through to the real command word
+    assert denylisted_reason("env git push") == "denied git subcommand 'push'"
+    assert denylisted_reason("nice git reset") == "denied git subcommand 'reset'"
+
+
 def test_denylist_rejects_the_whole_config_override_mechanism():
     # INVARIANT: '-c'/'--config-env' BEFORE the subcommand is denied outright.
     # Guarding the key name 'alias.' is not enough -- git config keys are

@@ -260,7 +260,32 @@ def _budget_for_plan(plan: list) -> str:
     return _format_budget(300)
 
 
-def render(result: dict, manifest: str, mode: str) -> str:
+_PATHLIKE_RE = re.compile(r"(?<![\w./-])((?:\.?[\w.-]+/)+[\w.-]*)")
+
+
+def unverified_paths(text: str, root: Path) -> list[str]:
+    """Return the path-like literals in `text` that do NOT exist under `root`.
+
+    Only repo-relative literals are considered. A model writes these from
+    memory, so they are untested code: one real brief sent a worker to
+    `.claude/scripts/orchestrate/` when the tree holds
+    `.claude/skills/orchestrate/scripts/`.
+
+    Absolute paths, `~` paths and URLs are skipped, because they are not this
+    tree's to verify."""
+    out: list[str] = []
+    for m in _PATHLIKE_RE.finditer(text or ""):
+        p = m.group(1)
+        if p.startswith(("/", "~", "http:", "https:")) or "://" in p:
+            continue
+        if (root / p.rstrip("/")).exists():
+            continue
+        if p not in out:
+            out.append(p)
+    return out
+
+
+def render(result: dict, manifest: str, mode: str, root: Path | None = None) -> str:
     valid = {ln.split(":", 1)[0] for ln in manifest.splitlines() if ":" in ln}
     skills = [s for s in result.get("applicable_skills", []) if s in valid]
     lines: list[str] = []
@@ -291,11 +316,18 @@ def render(result: dict, manifest: str, mode: str) -> str:
     acceptance = "\n".join(runnable) if runnable else "(none proven runnable)"
     intent = result.get("intent", "")
     bounds = [b for b in result.get("boundaries", []) if b]
+    unverified = unverified_paths(enriched, root) if root is not None else []
+    unver_para = ""
+    if unverified:
+        unver_para = ("Paths named above that do NOT exist in this tree — treat "
+                      "them as wrong and find the real one before you rely on "
+                      "them:\n"
+                      + "\n".join(f"- {p}" for p in unverified) + "\n\n")
     if mode == "worker":
         intent_para = f"Intent: {intent}\n\n" if intent else ""
         bounds_para = ("Out of scope:\n" + "\n".join(f"- {b}" for b in bounds) + "\n\n") if bounds else ""
         return (f"Task focus: {enriched}\n\n"
-                f"{intent_para}{bounds_para}"
+                f"{intent_para}{bounds_para}{unver_para}"
                 f"Apply these skills as relevant: {', '.join(skills) or 'none'}\n\n"
                 f"Grounded in: {grounded}\n\n"
                 f"Before you consider this done, verify:\n{checklist}\n")
@@ -422,7 +454,7 @@ def main(argv: list[str] | None = None) -> int:
                 transcript_path=os.environ.get("KICKOFF_DEBUG_TRANSCRIPT"),
             )
         result["cited_paths"] = sorted(set(cited))
-        print(render(result, manifest, args.mode))
+        print(render(result, manifest, args.mode, root=root))
         return 0
     except EngineError as e:
         return _passthrough(str(e).split("\n")[0][:80])

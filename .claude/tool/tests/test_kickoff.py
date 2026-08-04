@@ -67,6 +67,38 @@ def test_render_worker_shows_commands_not_goal(tmp_path):
     assert "Grounded in: (no files read)" in out
 
 
+def test_render_worker_flags_paths_that_do_not_exist(tmp_path):
+    # A real brief told a worker the orchestrate scripts were at
+    # `.claude/scripts/orchestrate/`. They are at
+    # `.claude/skills/orchestrate/scripts/`. The worker burned turns finding
+    # out. Path literals in generated prose are untested code.
+    _skill(tmp_path, "alpha", "a")
+    (tmp_path / ".claude" / "skills").mkdir(parents=True, exist_ok=True)
+    man = kk.build_manifest(tmp_path)
+    result = {"enriched_prompt": "Scan every .sh in .claude/scripts/orchestrate/ "
+                                 "and also read .claude/skills/",
+              "applicable_skills": ["alpha"], "verification_checklist": [],
+              "execution_hint": "solo", "cited_paths": []}
+    out = kk.render(result, man, mode="worker", root=tmp_path)
+    assert "Paths named above that do NOT exist" in out
+    assert ".claude/scripts/orchestrate/" in out.split("Paths named above")[1]
+    # a path that DOES exist must not be flagged
+    assert ".claude/skills/" not in out.split("Paths named above")[1]
+
+
+def test_render_worker_omits_the_block_when_every_path_exists(tmp_path):
+    _skill(tmp_path, "alpha", "a")
+    # _skill() writes to tmp_path/alpha, so create the path the prose names
+    (tmp_path / ".claude" / "skills" / "alpha").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".claude" / "skills" / "alpha" / "SKILL.md").write_text("x")
+    man = kk.build_manifest(tmp_path)
+    result = {"enriched_prompt": "read .claude/skills/alpha/SKILL.md",
+              "applicable_skills": ["alpha"], "verification_checklist": [],
+              "execution_hint": "solo", "cited_paths": []}
+    out = kk.render(result, man, mode="worker", root=tmp_path)
+    assert "Paths named above that do NOT exist" not in out
+
+
 def test_make_validator_flags_broken_and_requests_revision(tmp_path, monkeypatch):
     from tool.verify import CheckVerdict
     monkeypatch.setattr(kk, "validate_checklist", lambda cmds, root, **kw: [

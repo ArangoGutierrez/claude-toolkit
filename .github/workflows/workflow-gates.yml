@@ -28,6 +28,12 @@ jobs:
       - name: Workflow behaviour harness
         run: bash scripts/workflow-behavior_test.sh
 
+      - name: Routing-eval harness
+        run: bash .claude/evals/no-sonnet-routing_test.sh
+
+      - name: Eval suite
+        run: bash scripts/run-evals.sh
+
       - name: Regenerate the workflow table
         run: bash scripts/gen-workflow-docs.sh
 

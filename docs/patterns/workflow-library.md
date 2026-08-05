@@ -92,9 +92,12 @@ absent in headless runs; the auditors only use local tools.
 
 ### Customizing
 
-- **Models:** workflows inherit the session model. Pin a stage only when
-  you are sure a cheaper tier fits (e.g. `effort: 'low'` for mechanical
-  sweeps); when unsure, inherit.
+- **Models:** a stage inherits the session model unless it pins one. Of the 4
+  shipped workflows, 3 pin every stage and `weekly-audit` pins none. Where a
+  workflow pins, judgment stages take `opus` and mechanical stages take
+  `haiku`. The `model` field takes a short alias, so a full pinned id such as
+  `claude-opus-5` is not valid here. Override a stage when a cheaper tier fits
+  your repo.
 - **Agent types:** stages accept `agentType` (e.g. a repo-specific
   `principal-engineer`) — the shipped defaults avoid it so the library
   works in any clone.

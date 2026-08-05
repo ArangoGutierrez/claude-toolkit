@@ -33,29 +33,28 @@ only report BLOCKED. A whole dispatch is wasted before you notice.
 
 ### Model & effort
 
-Assign the model per role; do not leave Workers on the default (Opus) — a
-multi-agent run uses ~15× the tokens of a chat, so Opus on parallel Workers
-is pure waste. An Opus lead with Sonnet Workers outperformed a single-agent
-Opus by 90.2% ([Anthropic multi-agent research](https://www.anthropic.com/engineering/multi-agent-research-system)); model efficiency beats raising the
-token budget.
+Assign the model per role. Multi-agent runs use ~15× the tokens of a chat,
+so route each role deliberately. Workers run at Opus by default. Downgrade a
+Worker to Haiku for Complexity-1 tasks: rename, config, copy-paste work.
+Model routing beats a larger token budget.
 
 | Role | Model | Why |
 |------|-------|-----|
 | Team Lead (you) | Opus | Orchestration + synthesis is the judgment-heavy work |
 | Principal Engineer | Opus | Architecture/security review (matches `agents/principal-engineer.md`) |
 | QA Engineer | Opus | Test-quality + gate judgment (matches `agents/qa-engineer.md`) |
-| Worker (default) | Sonnet | Implementation against a well-specified task |
+| Worker (default) | Opus | Implementation against a well-specified task |
 | Worker (mechanical) | Haiku | Complexity-1 tasks: rename, config, copy-paste-with-adaptation |
 
-Set a Worker's model when dispatching it: pass `model: "sonnet"` (or
-`"haiku"`) to the `Agent` tool — the short alias resolves to the current default Sonnet/Haiku, so it won't go stale as versions increment. PE/QA inherit Opus from their agent
+Set a Worker's model when dispatching it: pass `model: "opus"` (or
+`"haiku"`) to the `Agent` tool. The field is an enum, so a full pinned id is not valid here. PE/QA inherit Opus from their agent
 definitions; do not override them downward.
 
 **Effort** is a session-level setting that applies to the Lead (you), not to
 spawned subagents — the `Agent` tool exposes `model` but not effort. Keep the
 Lead at `xhigh` (the global CLAUDE.md default) for coordination judgment. For
 subagents the **model tier is the effort proxy**: Haiku ≈ low-effort/low-cost
-(mechanical tasks), Sonnet ≈ balanced, Opus ≈ high-judgment (review). Do not try
+(mechanical tasks) and Opus ≈ high-judgment (review). Do not try
 to set per-worker effort — it is not a knob.
 
 ### Worker dispatch contract

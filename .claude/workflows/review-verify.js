@@ -76,7 +76,7 @@ log(`review-verify: ${dimensions.length} dimension(s) over: ${target}`)
 // depend on whether pipeline runs stage 2 for a null-valued item.
 let liveFinders = 0
 
-// Model routing v3 (2026-07-08): sonnet finders, opus refuters (gates keep their tier). Override via args.finderModel / args.verifierModel.
+// Model routing v5 (2026-08-05): opus finders, opus refuters. Sonnet left the routing tables by user policy. Override via args.finderModel / args.verifierModel.
 const results = await pipeline(
   dimensions,
   (dim) => agent(
@@ -86,7 +86,7 @@ const results = await pipeline(
     'Report only defects you can anchor to a specific file and line, each with a concrete failure scenario in `detail`. ' +
     'No style nits unless the dimension explicitly asks. ' +
     'If you find nothing real, return an empty findings array — never invent findings.',
-    { label: `review:${dim.split(/[\s:]/)[0]}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: (input && input.finderModel) || 'sonnet' },
+    { label: `review:${dim.split(/[\s:]/)[0]}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: (input && input.finderModel) || 'opus' },
   ).then((review) => { if (review) liveFinders++; return review }),
   (review, dim) => {
     if (!review || !Array.isArray(review.findings) || review.findings.length === 0) return []

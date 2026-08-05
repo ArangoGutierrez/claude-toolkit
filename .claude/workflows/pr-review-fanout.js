@@ -276,7 +276,7 @@ let liveReviewers = 0
 const results = await pipeline(
   reviewers,
   (r) => {
-    const base = { label: `review:${r.name}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: 'sonnet' }
+    const base = { label: `review:${r.name}`, phase: 'Review', schema: FINDINGS_SCHEMA, model: 'opus' }
     const attempt = !r.agentType
       ? agent(r.prompt, base)
       : agent(r.prompt, { ...base, agentType: r.agentType }).catch((e) => {

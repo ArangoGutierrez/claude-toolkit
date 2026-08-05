@@ -69,11 +69,11 @@ const criticPrompt = (brief, report) =>
   'REJECT with concrete, actionable issues if anything material fails the brief; otherwise APPROVE. ' +
   'Read-only plus running tests: do not fix, commit, push, or post anything.'
 
-// Model routing v3 (2026-07-08): sonnet builders (briefs are fully-specified), opus gates. Per-task override via tasks[i].model.
+// Model routing v5 (2026-08-05): opus builders, opus gates. Sonnet left the routing tables by user policy; the Agent model field is an enum, so a pinned id is not valid here. Per-task override via tasks[i].model.
 const results = await pipeline(
   tasks,
   (t, _orig, i) => {
-    const opts = { label: `build:${i}`, phase: 'Build', schema: REPORT_SCHEMA, model: t.model || 'sonnet' }
+    const opts = { label: `build:${i}`, phase: 'Build', schema: REPORT_SCHEMA, model: t.model || 'opus' }
     if (isolate) opts.isolation = 'worktree'
     return agent(builderPrompt(t.brief), opts)
   },
@@ -91,7 +91,7 @@ const results = await pipeline(
         `ORIGINAL BRIEF:\n${t.brief}\n\n` +
         `REVIEW ISSUES TO FIX (fix these and only these):\n- ${review.issues.join('\n- ')}\n\n` +
         'Same discipline: real verification output in `evidence`, conventional signed commits, no pushing or posting.',
-        { label: `fix:${i}`, phase: 'Gate', schema: REPORT_SCHEMA, model: t.model || 'sonnet' },
+        { label: `fix:${i}`, phase: 'Gate', schema: REPORT_SCHEMA, model: t.model || 'opus' },
       )
       review = fixed
         ? await agent(criticPrompt(t.brief, fixed), { label: `regate:${i}`, phase: 'Gate', schema: REVIEW_SCHEMA, model: 'opus' })

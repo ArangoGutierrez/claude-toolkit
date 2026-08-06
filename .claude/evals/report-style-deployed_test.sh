@@ -28,12 +28,12 @@ for f in "$EVAL_SRC" "$RULE_SRC"; do
   [ -f "$f" ] || { echo "$NAME: FAIL — missing input: $f"; exit 1; }
 done
 
-# An unchecked mktemp "${TMPDIR:-/tmp}/eval.XXXXXX" leaves TMP empty, targets fixtures at /, and turns every
+# An unchecked mktemp leaves TMP empty, targets fixtures at /, and turns every
 # case into a misleading rc mismatch instead of an explicit abort.
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX")" || { echo "$NAME: FAIL — mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX" failed"; exit 1; }
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX")" || { echo "$NAME: FAIL — mktemp -d failed"; exit 1; }
 case "$TMP" in
-  /*) [ -d "$TMP" ] || { echo "$NAME: FAIL — mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX" gave no directory"; exit 1; } ;;
-   *) echo "$NAME: FAIL — mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX" gave a non-absolute path: '$TMP'"; exit 1 ;;
+  /*) [ -d "$TMP" ] || { echo "$NAME: FAIL — mktemp -d gave no directory"; exit 1; } ;;
+   *) echo "$NAME: FAIL — mktemp -d gave a non-absolute path: '$TMP'"; exit 1 ;;
 esac
 trap 'rm -rf "$TMP"' EXIT
 

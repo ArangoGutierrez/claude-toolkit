@@ -27,6 +27,7 @@ non-sensitive structured signal.
 from __future__ import annotations
 import json
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,25 @@ def resolve_jsonl_path(configured: str | None = None) -> Path:
     return Path(override or configured or DEFAULT_JSONL).expanduser()
 
 
+def _warn_drop(reason: str, path) -> None:
+    """Emit ONE stderr line when a decision record is dropped.
+
+    Best-effort: this runs on the panel's failure path where the stdout
+    directive (parsed by the skill via jq) still has to survive, so the
+    warning must never raise and must never touch stdout.
+    """
+    try:
+        # sys.stderr.write, not print(file=sys.stderr): when sys.stderr is
+        # None, print silently falls back to STDOUT (would corrupt the jq-
+        # parsed directive); .write raises AttributeError into the swallow.
+        sys.stderr.write(
+            f"[panel-telemetry] WARNING: decision record dropped ({reason}: {path}) "
+            f"— run aggregate sandbox-disabled or widen the sandbox allowlist\n"
+        )
+    except Exception:
+        pass
+
+
 def append_decision(record: dict[str, Any], jsonl_path: str | None = None) -> bool:
     """Append one decision record as a single JSONL line. Best-effort.
 
@@ -62,6 +82,7 @@ def append_decision(record: dict[str, Any], jsonl_path: str | None = None) -> bo
     try:
         line = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
     except (TypeError, ValueError):
+        _warn_drop("serialize", resolve_jsonl_path(jsonl_path))
         return False
 
     path = resolve_jsonl_path(jsonl_path)
@@ -69,12 +90,14 @@ def append_decision(record: dict[str, Any], jsonl_path: str | None = None) -> bo
         path.parent.mkdir(parents=True, exist_ok=True)
         os.chmod(path.parent, 0o700)
     except OSError:
+        _warn_drop("mkdir", path)
         return False
 
     try:
         with open(path, "a", encoding="utf-8") as f:
             f.write(line + "\n")
     except OSError:
+        _warn_drop("write", path)
         return False
 
     try:

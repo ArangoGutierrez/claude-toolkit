@@ -19,6 +19,7 @@ if [ ! -f "$GOAL_FILE" ]; then
   echo ""
   echo "[session-goal] No session goal set for ${UUID:0:8}."
   echo "[session-goal] Run /goal to capture one (optional in v1)."
+  echo "[daily-flow] goal → brainstorm → plan → TDD → review → finish. Run /day to orient."
 fi
 
 exit 0

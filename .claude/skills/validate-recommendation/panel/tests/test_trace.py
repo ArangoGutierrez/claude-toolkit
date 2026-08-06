@@ -50,3 +50,19 @@ def test_log_verdict_appends_not_overwrites(tmp_path, monkeypatch):
     assert "first" in content
     assert "second" in content
     assert content.count("outcome=") == 2
+
+
+def test_log_verdict_warns_at_most_once_per_process(tmp_path, monkeypatch, capsys):
+    """Trace is high-frequency: a dropped write warns on stderr, but only the
+    first time in a process so a broken path can't flood the operator's log."""
+    from panel.trace import log_verdict
+    monkeypatch.setattr("panel.trace._warned", False, raising=False)  # reset the per-process guard
+    blocker = tmp_path / "blocker"
+    blocker.write_text("i am a file, not a directory\n")
+    target = blocker / "trace.log"  # parent is a regular file → mkdir fails
+    monkeypatch.setenv("CLAUDE_PANEL_TRACE_LOG", str(target))
+    log_verdict("HOLD", "first")
+    log_verdict("DISSENT", "second")
+    err = capsys.readouterr().err
+    assert err.count("[panel-trace] WARNING:") == 1
+    assert not target.exists()

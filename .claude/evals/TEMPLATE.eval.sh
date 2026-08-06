@@ -33,9 +33,9 @@ if [ ! -e "$SUBJECT" ]; then
   exit 2
 fi
 
-# --- Fixture setup (hermetic; mktemp) ----------------------------------------
+# --- Fixture setup (hermetic; mktemp "${TMPDIR:-/tmp}/eval.XXXXXX") ----------------------------------------
 # Work on a COPY in a throwaway dir; never mutate the live artifact.
-WORK="$(mktemp -d)"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX")"
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below.
 cleanup() { rm -rf "$WORK"; }   # explicit path only — never a glob (a failed
 trap cleanup EXIT               # glob would abort the whole rm and leak temp).

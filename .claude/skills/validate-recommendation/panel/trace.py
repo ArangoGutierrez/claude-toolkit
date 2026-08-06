@@ -7,10 +7,37 @@ Override path via $CLAUDE_PANEL_TRACE_LOG for tests and alternative
 log routing.
 """
 import os
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 DEFAULT_TRACE_LOG = Path.home() / ".claude" / "debug" / "panel-trace.log"
+
+# Process-global: trace is high-frequency, so a dropped write warns at most
+# once per process — a broken path must never flood the operator's stderr.
+_warned = False
+
+
+def _warn_trace_drop(reason: str, path) -> None:
+    """Emit ONE stderr line the first time a trace write drops in this process.
+
+    Best-effort: the warning must never raise, and never fires more than once
+    (unlike telemetry, which warns every drop — trace is far more frequent).
+    """
+    global _warned
+    if _warned:
+        return
+    _warned = True
+    try:
+        # sys.stderr.write, not print(file=sys.stderr): when sys.stderr is
+        # None, print silently falls back to STDOUT; .write raises into the
+        # swallow instead (stdout must stay clean for the jq-parsed directive).
+        sys.stderr.write(
+            f"[panel-trace] WARNING: trace line dropped ({reason}: {path}) "
+            f"— run sandbox-disabled or widen the sandbox allowlist\n"
+        )
+    except Exception:
+        pass
 
 
 def _resolve_log_path() -> Path:
@@ -30,6 +57,7 @@ def log_verdict(outcome: str, detail: str) -> None:
     try:
         log_path.parent.mkdir(parents=True, exist_ok=True)
     except OSError:
+        _warn_trace_drop("mkdir", log_path)
         return
 
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -45,4 +73,5 @@ def log_verdict(outcome: str, detail: str) -> None:
         except OSError:
             pass
     except OSError:
+        _warn_trace_drop("write", log_path)
         return

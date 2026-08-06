@@ -41,6 +41,12 @@ run_case "no goal file -> nudge" \
   0 "No session goal set" \
   HOME="$TMP"
 
+# Scenario 1b: no goal file → output also includes the daily-flow reminder
+run_case "no goal file -> flow reminder" \
+  "{\"transcript_path\":\"$FAKE_TRANSCRIPT\"}" \
+  0 "Run /day to orient" \
+  HOME="$TMP"
+
 # Scenario 2: goal file present → silent
 mkdir -p "$TMP/.claude/audit/session-goals"
 echo "## Initial 2026-05-18T00:00:00Z" > "$TMP/.claude/audit/session-goals/abc12345-deadbeef.md"

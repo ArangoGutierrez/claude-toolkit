@@ -1,6 +1,7 @@
 ---
 name: worktree-guide
 description: Use when creating worktrees or starting implementation work in isolated branches from agents-workbench
+disable-model-invocation: true
 user-invocable: true
 ---
 

@@ -24,4 +24,21 @@ printf '%s' "$scores" > "$outdir/scores.json"
 # guard the gate: report.sh exits 1 on FAILs; set -e would abort before we print/cat
 set +e; "$here/report.sh" "$outdir/scores.json" > "$outdir/scorecard.md"; rc=$?; set -e
 cat "$outdir/scorecard.md"
+
+# Persist to evidence/, which is where evals/scorecard-staleness.sh looks.
+# Until 2026-08-06 the scorecard only ever reached the scratch .out/ dir, so
+# running this tool could never satisfy the guard that demands a fresh one —
+# the staleness eval had been red since 2026-07-26 with no way to clear it.
+# Written even on rc=1: a run that found failures is still evidence of a run.
+evidence="${SKILL_EVAL_EVIDENCE:-$ROOT/skill-eval/evidence}"
+if mkdir -p "$evidence" 2>/dev/null; then
+  card="$evidence/$(date +%F)-scorecard.md"
+  if cp -f "$outdir/scorecard.md" "$card" 2>/dev/null; then
+    echo "wrote $card" >&2
+  else
+    echo "WARN: could not write $card" >&2
+  fi
+else
+  echo "WARN: could not create $evidence" >&2
+fi
 exit "$rc"

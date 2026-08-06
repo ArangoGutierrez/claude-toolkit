@@ -2,6 +2,7 @@
 name: principal-engineer
 description: Architecture review, Go/K8s conventions, security audit. Absorbs go-architect + security-reviewer roles.
 model: opus
+effort: xhigh
 tools:
   - Read
   - Grep

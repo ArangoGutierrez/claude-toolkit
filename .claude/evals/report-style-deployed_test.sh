@@ -122,22 +122,19 @@ while IFS= read -r lit; do
   fi
   run_case "repo: clause $i gutted -> FAIL" 1 "$FAIL_LINE" "$TMP/live-good.md"
 done <<'LITERALS'
-**Apply STE to:** chat messages to the user
-**Do not apply STE to:** code, code comments, and commit messages
+Output tokens cost more than input tokens, so density is the goal.
 ## Writing rules
-- Use the active voice.
-- Use the simple present tense.
-- Use a maximum of 3 nouns in a row.
-to 20 words
-to 25 words
-| Use | Do not use |
-| use | utilize, leverage |
-| before | prior to |
-The full ASD-STE100 dictionary is copyright ASD.
+- Use the active voice and the simple present tense.
+- Give one idea per sentence. Keep a sentence under 25 words.
+- State the finding first, then the rationale. No preamble and no filler.
+- Put complex data in a table, not in a long sentence.
+- Quote output, paths, identifiers, and errors verbatim. Never paraphrase one.
+Outward-facing writing keeps a natural tone: PR text, email, Slack, blog posts.
+Code and commit messages keep their own conventions.
 LITERALS
 
-if [ "$i" -ne 12 ]; then
-  echo "$NAME: FAIL — expected 12 clauses in the battery, iterated $i"
+if [ "$i" -ne 9 ]; then
+  echo "$NAME: FAIL — expected 9 clauses in the battery, iterated $i"
   exit 1
 fi
 
@@ -147,15 +144,15 @@ fi
 # rule is switched off.
 cp "$RULE_SRC" "$REPO_FIXTURE"
 mutate "$RULE_SRC" "$TMP/live-inverted.md" \
-  "**Apply STE to:** chat messages to the user" \
-  "**Apply STE to:** nothing at all" \
+  "Outward-facing writing keeps a natural tone: PR text, email, Slack, blog posts." \
+  "Outward-facing writing follows the same rules as everything else." \
   || { echo "$NAME: FAIL — inversion mutation did not apply"; exit 1; }
 run_case "live: scope inverted -> FAIL" 1 "$FAIL_LINE" "$TMP/live-inverted.md"
 
 # ------------------------------------------------------------- stub probe ---
 # A file holding only the section headings is not the rule.
 cp "$RULE_SRC" "$REPO_FIXTURE"
-printf '# Report Style\n\n## Where this applies\n\n## Writing rules\n\n## Preferred words\n' \
+printf '# Report Style\n\n## Writing rules\n\n## Where this does not apply\n' \
   > "$TMP/live-stub.md"
 run_case "live: headings-only stub -> FAIL" 1 "$FAIL_LINE" "$TMP/live-stub.md"
 
@@ -166,7 +163,7 @@ run_case "live: empty file -> FAIL" 1 "$FAIL_LINE" "$TMP/live-empty.md"
 
 # ----------------------------------------------------------------- verdict ---
 if [ "$fails" -eq 0 ]; then
-  echo "$NAME: PASS — $cases/$cases cases; the eval discriminates on all 12 clauses, both copies"
+  echo "$NAME: PASS — $cases/$cases cases; the eval discriminates on all 9 clauses, both copies"
   exit 0
 fi
 echo "$NAME: FAIL — $fails of $cases cases wrong"

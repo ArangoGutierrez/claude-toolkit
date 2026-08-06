@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# graphify-graph-hint.sh — global PreToolUse hook (register on matchers "Bash" and "Read|Glob").
+# graphify-graph-hint.sh — global PreToolUse hook (register on matchers "Bash" and "Read|Glob|Grep").
 #
 # When the current project has a Graphify code graph (graphify-out/graph.json) and Claude is
 # about to do a raw source search/read, inject a one-line reminder to orient via `graphify query`

@@ -35,6 +35,10 @@ CLAUDE_EXCLUDES=(
   remote-settings.json
   plugins/.last_inuse_sweep
   plugins/installed_plugins.json
+  # Generated, never authored. Unanchored so it matches at ANY depth:
+  # skills/*/__pycache__ was reported as deploy drift on every run.
+  __pycache__/
+  .pytest_cache/
 )
 
 CURSOR_EXCLUDES=(

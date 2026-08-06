@@ -2,6 +2,7 @@
 name: doc-writer
 description: Generate and update documentation — READMEs, godoc, ADRs. Concise, no marketing language.
 model: opus
+effort: low
 tools:
   - Read
   - Write

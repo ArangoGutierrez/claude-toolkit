@@ -1,6 +1,7 @@
 ---
 name: test-review
 description: Test and CI review — detect theater tests vs real tests, e2e suite quality, GitHub Actions and Prow config correctness. Triggered by "review these tests", "is this a real test", "review the workflow", "review this e2e", or /test-review
+disable-model-invocation: true
 user-invocable: true
 tools:
   - Read

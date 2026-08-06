@@ -1,6 +1,7 @@
 ---
 name: k8s-review
 description: Kubernetes-specific code review — YAML correctness, Helm charts, API best practices, RBAC least-privilege. Triggered by "review Kubernetes manifests", "review Helm chart", "RBAC audit", or /k8s-review
+disable-model-invocation: true
 user-invocable: true
 tools:
   - Read

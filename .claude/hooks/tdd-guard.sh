@@ -211,7 +211,11 @@ if [ "$FOUND_TEST" = false ]; then
     echo "" >&2
     # Use test-dep-map to show related tests if any exist via cross-references
     SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-    DEP_MAP=$("$SCRIPT_DIR/test-dep-map.sh" "$GIT_ROOT/$REL_PATH" 2>/dev/null)
+    if [ -x "$SCRIPT_DIR/test-dep-map.sh" ]; then
+        DEP_MAP=$("$SCRIPT_DIR/test-dep-map.sh" "$GIT_ROOT/$REL_PATH" 2>/dev/null)
+    else
+        DEP_MAP=""
+    fi
     if [ -n "$DEP_MAP" ] && ! echo "$DEP_MAP" | grep -q "NO TESTS FOUND"; then
         echo "Related test files found by dependency analysis:" >&2
         echo "$DEP_MAP" >&2

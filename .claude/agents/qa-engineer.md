@@ -2,6 +2,7 @@
 name: qa-engineer
 description: Test quality, mutation checks, CI replication, external review triage, 11-point PR readiness gate. Sole writer to learned-anti-patterns.md during team execution.
 model: opus
+effort: high
 tools:
   - Read
   - Grep

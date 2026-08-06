@@ -33,7 +33,7 @@ if [ ! -e "$SUBJECT" ]; then
   exit 2
 fi
 
-# --- Fixture setup (hermetic; mktemp "${TMPDIR:-/tmp}/eval.XXXXXX") ----------------------------------------
+# --- Fixture setup (hermetic; mktemp) ----------------------------------------
 # Work on a COPY in a throwaway dir; never mutate the live artifact.
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX")"
 # shellcheck disable=SC2329  # invoked indirectly via the EXIT trap below.

@@ -27,12 +27,12 @@ NAME="no-sonnet-routing_test"
 [ -f "$EVAL_SRC" ] || { echo "$NAME: FAIL — missing input: $EVAL_SRC"; exit 1; }
 [ -d "$WORKFLOWS_SRC" ] || { echo "$NAME: FAIL — missing input: $WORKFLOWS_SRC"; exit 1; }
 
-# An unchecked mktemp "${TMPDIR:-/tmp}/eval.XXXXXX" leaves TMP empty, targets fixtures at /, and turns every
+# An unchecked mktemp leaves TMP empty, targets fixtures at /, and turns every
 # case into a misleading rc mismatch instead of an explicit abort.
-TMP="$(mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX")" || { echo "$NAME: FAIL — mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX" failed"; exit 1; }
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX")" || { echo "$NAME: FAIL — mktemp -d failed"; exit 1; }
 case "$TMP" in
-  /*) [ -d "$TMP" ] || { echo "$NAME: FAIL — mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX" gave no directory"; exit 1; } ;;
-   *) echo "$NAME: FAIL — mktemp -d "${TMPDIR:-/tmp}/eval.XXXXXX" gave a non-absolute path: '$TMP'"; exit 1 ;;
+  /*) [ -d "$TMP" ] || { echo "$NAME: FAIL — mktemp -d gave no directory"; exit 1; } ;;
+   *) echo "$NAME: FAIL — mktemp -d gave a non-absolute path: '$TMP'"; exit 1 ;;
 esac
 # Explicit path only — never a glob. A glob that matches nothing aborts the whole
 # rm and leaks the directory.

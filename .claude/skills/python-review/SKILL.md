@@ -1,6 +1,7 @@
 ---
 name: python-review
 description: Python code review specialized for AI/MLOps/agent codebases — typing (pyright), async correctness, agent-loop invariants, ML reproducibility, model serialization safety. Triggered by "review Python", "review this agent code", "review the training pipeline", or /python-review
+disable-model-invocation: true
 user-invocable: true
 tools:
   - Read

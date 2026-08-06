@@ -1,6 +1,7 @@
 ---
 name: js-review
 description: JavaScript/TypeScript/Node code review — async correctness, TypeScript strictness, Node patterns, dependency hygiene, JS security. Triggered by "review JavaScript", "review TypeScript", "review Node code", "JS best practices", or /js-review
+disable-model-invocation: true
 user-invocable: true
 tools:
   - Read

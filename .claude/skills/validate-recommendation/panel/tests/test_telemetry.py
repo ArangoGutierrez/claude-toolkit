@@ -181,3 +181,40 @@ def test_cli_aggregate_unwritable_telemetry_exit_code_unchanged(tmp_path, monkey
     assert rc == 0
     directive = json.loads(capsys.readouterr().out.strip())  # stdout still carries the directive
     assert directive["verdict"] == "HOLD"
+
+
+# ---- loud-on-drop stderr warnings (telemetry must never touch stdout) ----
+
+def test_append_decision_unwritable_path_warns_on_stderr(tmp_path, monkeypatch, capsys):
+    blocker = tmp_path / "blocker"
+    blocker.write_text("i am a file, not a directory\n")
+    target = blocker / "decisions.jsonl"  # parent is a regular file → mkdir fails
+    monkeypatch.setenv(ENV_OVERRIDE, str(target))
+    ok = append_decision({"event": "decision"})
+    assert ok is False
+    captured = capsys.readouterr()
+    assert "[panel-telemetry] WARNING: decision record dropped" in captured.err
+    assert str(target) in captured.err  # the resolved path is named so the operator can act
+    assert captured.out == ""  # stdout is the jq-parsed directive channel — never touched
+
+
+def test_cli_aggregate_unwritable_telemetry_stderr_warns_stdout_clean(tmp_path, monkeypatch, capsys):
+    blocker = tmp_path / "blocker"
+    blocker.write_text("not a directory\n")
+    target = blocker / "decisions.jsonl"  # unwritable
+    monkeypatch.setenv(ENV_OVERRIDE, str(target))
+    cfg = _hold_config(tmp_path)
+    vdir = tmp_path / "verdicts"
+    _write_verdict(vdir, "da-test", "HOLD", "A holds; nothing stronger found.", "n/a")
+
+    rc = main([
+        "aggregate",
+        "--config", str(cfg),
+        "--verdicts-dir", str(vdir),
+        "--recommended-label", "Option A (Recommended)",
+    ])
+    assert rc == 0
+    captured = capsys.readouterr()
+    directive = json.loads(captured.out.strip())  # stdout still parses as the JSON directive
+    assert directive["verdict"] == "HOLD"
+    assert "[panel-telemetry] WARNING: decision record dropped" in captured.err

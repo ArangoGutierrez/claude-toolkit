@@ -1,6 +1,7 @@
 ---
 name: tdd-protocol
 description: Use when starting implementation work
+disable-model-invocation: true
 user-invocable: true
 ---
 

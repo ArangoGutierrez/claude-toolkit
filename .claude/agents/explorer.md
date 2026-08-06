@@ -2,6 +2,7 @@
 name: explorer
 description: Cheap read-only codebase exploration. Use to avoid context bloat in main session.
 model: opus
+effort: low
 tools:
   - Read
   - Grep

@@ -1,3 +1,12 @@
+---
+paths:
+  - "**/Dockerfile*"
+  - "**/Containerfile*"
+  - "**/*.dockerfile"
+  - "**/*.container"
+  - "**/*.service"
+  - "**/.dockerignore"
+---
 # Container Conventions
 
 ## Image Builds

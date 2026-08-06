@@ -54,7 +54,7 @@ definitions; do not override them downward.
 spawned subagents — the `Agent` tool exposes `model` but not effort. Keep the
 Lead at `xhigh` (the global CLAUDE.md default) for coordination judgment. For
 subagents the **model tier is the effort proxy**: Haiku ≈ low-effort/low-cost
-(mechanical tasks) and Opus ≈ high-judgment (review). Do not try
+(mechanical tasks) and Opus ≈ everything else, from implementation to review. Do not try
 to set per-worker effort — it is not a knob.
 
 ### Worker dispatch contract
@@ -74,13 +74,15 @@ Workers report one of four statuses (from `superpowers:subagent-driven-developme
 | `DONE` | Complete and self-reviewed | Proceed to PE/QA review |
 | `DONE_WITH_CONCERNS` | Complete but doubts flagged | Read the concerns; fix correctness/scope ones before review |
 | `NEEDS_CONTEXT` | Missing information | Supply it; re-dispatch a fresh foreground agent |
-| `BLOCKED` | Cannot complete | Re-scope, re-dispatch with a stronger model, or escalate — never retry the same model unchanged |
+| `BLOCKED` | Cannot complete | Re-scope, supply missing context, raise a Haiku Worker to Opus, or escalate — never retry unchanged |
 
 The Lead owns these transitions. On `DONE_WITH_CONCERNS`, resolve any
 correctness or scope concern (re-dispatch the Worker, or fix it inline) before
-sending the work to PE/QA. On `BLOCKED`, triage before retrying: under-specified
-task → re-scope; needs more reasoning → a stronger model; missing access or a
-wrong plan → escalate to the user. §5 Error Recovery covers the wave-level fallout.
+sending the work to PE/QA. On `BLOCKED`, triage before retrying. An
+under-specified task needs a re-scope. A Haiku Worker that needs more reasoning
+goes to Opus. An Opus Worker that is still blocked goes to the user, because
+Opus is the top tier and no stronger model exists. Missing access or a wrong
+plan also escalates. §5 Error Recovery covers the wave-level fallout.
 
 ## Execution Workflow
 

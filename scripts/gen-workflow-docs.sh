@@ -22,7 +22,7 @@ shopt -s nullglob
 files=("$WF_DIR"/*.js)
 [ "${#files[@]}" -gt 0 ] || { echo "ERROR: no workflows in $WF_DIR" >&2; exit 1; }
 
-TABLE="$(mktemp)"; trap 'rm -f "$TABLE" "$TABLE.new"' EXIT
+TABLE="$(mktemp "${TMPDIR:-/tmp}/wf-table.XXXXXX")"; trap 'rm -f "$TABLE" "$TABLE.new"' EXIT
 {
   echo '| Workflow | Invoke | Purpose |'
   echo '|---|---|---|'

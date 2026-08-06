@@ -82,7 +82,7 @@ build_overlay_excludes() {
     echo "ERROR: overlay repo $overlay_repo: 'git ls-files .claude/*' failed or returned nothing — refusing to deploy over overlay-owned paths" >&2
     exit 4
   fi
-  OVERLAY_EXCLUDE_FILE="$(mktemp)"
+  OVERLAY_EXCLUDE_FILE="$(mktemp "${TMPDIR:-/tmp}/deploy-overlay.XXXXXX")"
   # Anchor every pattern at the transfer root (leading /): an unanchored
   # rsync pattern matches at ANY depth and would over-exclude same-named
   # deeper files (e.g. /rules/x.md must not shadow team/rules/x.md).

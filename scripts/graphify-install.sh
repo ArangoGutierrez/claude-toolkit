@@ -61,7 +61,7 @@ fi
 backup="$SETTINGS.bak-graphify-$(date +%Y%m%d-%H%M%S)"
 command cp -f "$SETTINGS" "$backup"
 
-tmpf="$(mktemp)"
+tmpf="$(mktemp "${TMPDIR:-/tmp}/graphify-install.XXXXXX")"
 jq --arg cmd "$HOOK_CMD" '
   .hooks.PreToolUse += [
     {matcher:"Bash",      hooks:[{type:"command", command:$cmd}]},

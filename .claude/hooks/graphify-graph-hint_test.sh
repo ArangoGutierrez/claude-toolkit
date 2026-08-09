@@ -1,43 +1,83 @@
 #!/usr/bin/env bash
-# Tests for graphify-graph-hint.sh — global once-per-session graph-hint PreToolUse hook.
+# Tests for graphify-graph-hint.sh — the SessionStart graph-hint hook.
 # Plain bash (no bats), matching the repo's *_test.sh convention.
+#
+# Contract under test:
+#   - a project WITH graphify-out/graph.json  -> plain-text hint on stdout
+#   - a project WITHOUT one                   -> silent, rc 0
+#   - project dir resolves env -> payload .cwd -> PWD, in that order
+#   - the hint re-fires on every SessionStart (startup/resume/clear/compact),
+#     because each is a context boundary where the earlier hint is gone
+#   - stdout is plain text, and never claims the PreToolUse event
 set -uo pipefail
 HOOK="$(cd "$(dirname "$0")" && pwd)/graphify-graph-hint.sh"
 fails=0
-tmproot="$(mktemp -d)"; trap 'rm -rf "$tmproot"' EXIT
+# Anchor at $TMPDIR: macOS mktemp with no template resolves through
+# _CS_DARWIN_USER_TEMP_DIR instead, which an agent sandbox denies.
+tmproot="$(mktemp -d "${TMPDIR:-/tmp}/graphify-graph-hint-test.XXXXXX")"
+trap 'rm -rf "$tmproot"' EXIT
 
-# A project WITH a graph, and one WITHOUT.
+# A project WITH a graph, and one WITHOUT. Every case runs from a controlled cwd
+# so a stray graph in the tester's own directory can never make a case pass.
 repo="$tmproot/repo"; mkdir -p "$repo/graphify-out"; echo '{}' > "$repo/graphify-out/graph.json"
 norepo="$tmproot/norepo"; mkdir -p "$norepo"
 
-run() { # $1=projectdir $2=sessionid $3=json-payload -> hook stdout
-  CLAUDE_PROJECT_DIR="$1" CLAUDE_SESSION_ID="$2" TMPDIR="$tmproot" bash "$HOOK" <<<"$3"
+rc=0
+run() { # $1=CLAUDE_PROJECT_DIR ("" unsets it) $2=cwd $3=payload -> stdout; sets $rc
+  local out
+  out="$(
+    cd "$2" || exit 99
+    if [ -n "$1" ]; then export CLAUDE_PROJECT_DIR="$1"; else unset CLAUDE_PROJECT_DIR; fi
+    TMPDIR="$tmproot" bash "$HOOK" <<<"$3"
+  )"; rc=$?
+  printf '%s' "$out"
 }
-empty()    { if [ -n "$2" ]; then echo "FAIL: $1 (expected silent, got: $2)"; fails=$((fails+1)); else echo "ok: $1"; fi; }
-contains() { if printf '%s' "$2" | grep -q "$3"; then echo "ok: $1"; else echo "FAIL: $1 (missing '$3' in: $2)"; fails=$((fails+1)); fi; }
 
-BASH_GREP='{"tool_name":"Bash","tool_input":{"command":"grep -r foo src/"}}'
-BASH_LS='{"tool_name":"Bash","tool_input":{"command":"ls -la"}}'
-READ_TSX='{"tool_name":"Read","tool_input":{"file_path":"apps/web/Login.tsx"}}'
-READ_PNG='{"tool_name":"Read","tool_input":{"file_path":"docs/diagram.png"}}'
-READ_GRAPH='{"tool_name":"Read","tool_input":{"file_path":"graphify-out/GRAPH_REPORT.md"}}'
-GREP_TOOL='{"tool_name":"Grep","tool_input":{"pattern":"useEffect","path":"src"}}'
+ok()   { echo "ok: $1"; }
+bad()  { echo "FAIL: $1"; fails=$((fails+1)); }
+empty()       { if [ -n "$2" ]; then bad "$1 (expected silent, got: $2)"; else ok "$1"; fi; }
+contains()    { if printf '%s' "$2" | grep -qF "$3"; then ok "$1"; else bad "$1 (missing '$3' in: $2)"; fi; }
+notcontains() { if printf '%s' "$2" | grep -qF "$3"; then bad "$1 (forbidden '$3' present in: $2)"; else ok "$1"; fi; }
+startswith()  { case "$2" in "$3"*) ok "$1" ;; *) bad "$1 (expected prefix '$3', got: $2)" ;; esac; }
+rc_is()       { if [ "$rc" -eq "$2" ]; then ok "$1"; else bad "$1 (rc=$rc, want $2)"; fi; }
 
-# 1) No graph in the project -> silent no-op (the guard).
-empty "no graph -> silent" "$(run "$norepo" s1 "$BASH_GREP")"
-# 2) Graph + a search command, first call this session -> emits the hint.
-contains "graph + grep (first call) -> emits" "$(run "$repo" s2 "$BASH_GREP")" "graphify query"
-# 3) Graph + search, SAME session, second call -> silent (once-per-session dedup).
-empty "graph + grep (same session 2nd) -> silent" "$(run "$repo" s2 "$BASH_GREP")"
-# 4) Graph + Read of a source file in a NEW session -> emits again.
-contains "graph + Read .tsx (new session) -> emits" "$(run "$repo" s3 "$READ_TSX")" "graphify query"
-# 5) Graph + Read of a NON-source file -> silent (relevance gate).
-empty "graph + Read .png -> silent" "$(run "$repo" s4 "$READ_PNG")"
-# 6) Graph + a non-search Bash command -> silent (relevance gate).
-empty "graph + Bash ls -> silent" "$(run "$repo" s5 "$BASH_LS")"
-# 7) Graph + Read of the graph artifact itself -> silent (don't nag about reading graphify-out/).
-empty "graph + Read graphify-out/ -> silent" "$(run "$repo" s6 "$READ_GRAPH")"
-# 8) Graph + the dedicated Grep tool (raw-source search), new session -> emits.
-contains "graph + Grep tool (new session) -> emits" "$(run "$repo" s7 "$GREP_TOOL")" "graphify query"
+# Realistic SessionStart payloads — note there is no tool_name and no tool_input.
+SS_START='{"session_id":"s-a","transcript_path":"/tmp/t.jsonl","hook_event_name":"SessionStart","source":"startup"}'
+SS_COMPACT='{"session_id":"s-a","transcript_path":"/tmp/t.jsonl","hook_event_name":"SessionStart","source":"compact"}'
+SS_CWD_GRAPH="{\"session_id\":\"s-b\",\"hook_event_name\":\"SessionStart\",\"source\":\"startup\",\"cwd\":\"$repo\"}"
+SS_CWD_NONE="{\"session_id\":\"s-c\",\"hook_event_name\":\"SessionStart\",\"source\":\"startup\",\"cwd\":\"$norepo\"}"
+
+# 1) No graph -> silent no-op, and never blocks session start.
+out="$(run "$norepo" "$norepo" "$SS_START")"
+empty "no graph -> silent" "$out"
+rc_is "no graph -> rc 0" 0
+
+# 2) Graph present -> the hint fires on a plain SessionStart payload.
+out="$(run "$repo" "$norepo" "$SS_START")"
+contains "graph -> emits hint" "$out" "graphify query"
+rc_is "graph -> rc 0" 0
+# Output contract: plain text on stdout (like inject-date.sh), not a JSON envelope.
+startswith "graph -> plain text, not JSON" "$out" "graphify:"
+# A SessionStart hook must never announce itself as PreToolUse.
+notcontains "graph -> does not claim PreToolUse" "$out" "PreToolUse"
+
+# 3) Same session, a second SessionStart (compact) -> emits AGAIN. A compact drops the
+#    earlier hint from context, so suppressing the repeat would silently lose the nudge.
+out="$(run "$repo" "$norepo" "$SS_COMPACT")"
+contains "same session, compact -> emits again" "$out" "graphify query"
+
+# 4) No CLAUDE_PROJECT_DIR: the project dir comes from the payload's .cwd.
+out="$(run "" "$norepo" "$SS_CWD_GRAPH")"
+contains "payload .cwd with graph -> emits" "$out" "graphify query"
+out="$(run "" "$norepo" "$SS_CWD_NONE")"
+empty "payload .cwd without graph -> silent" "$out"
+
+# 5) No env, no payload at all: fall back to PWD. Both directions, so the silent
+#    case above cannot be passing merely because the hook is inert.
+out="$(run "" "$norepo" "")"
+empty "empty payload, PWD without graph -> silent" "$out"
+rc_is "empty payload -> rc 0" 0
+out="$(run "" "$repo" "")"
+contains "empty payload, PWD with graph -> emits" "$out" "graphify query"
 
 echo "---"; if [ "$fails" -eq 0 ]; then echo "ALL PASS"; else echo "$fails FAILED"; exit 1; fi

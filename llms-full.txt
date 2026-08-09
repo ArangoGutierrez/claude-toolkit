@@ -1078,15 +1078,15 @@ commands above are cheaper.
 ## How the toolkit wires it in
 
 - **`scripts/graphify-install.sh`** — installs the Graphify Claude Code
-  integration (hook, rule, and `settings.json` `PreToolUse` entries) into a
+  integration (hook, rule, and a `settings.json` `SessionStart` entry) into a
   Claude config directory. Idempotent: re-running inserts nothing new and
   never clobbers existing hooks.
 - **`.claude/rules/graphify.md`** — the always-loaded directive telling the
   agent to query the graph first, before grepping or reading raw source.
-- **`.claude/hooks/graphify-graph-hint.sh`** — a `PreToolUse` hook on
-  `Bash`/`Glob`/`Grep` that, once per session, reminds the agent to query
-  the graph before a raw-source search. It is a silent no-op in any repo
-  without a graph.
+- **`.claude/hooks/graphify-graph-hint.sh`** — a `SessionStart` hook that
+  reminds the agent to query the graph before a raw-source search, so the
+  reminder lands ahead of the first search rather than racing it. It is a
+  silent no-op in any repo without a graph.
 
 ## Keep the graph fresh
 

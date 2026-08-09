@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # Runs `graphify update <path>` — AST-only extraction, no LLM and no API key.
 # Once the graph exists at <path>/graphify-out/graph.json, the bundled
-# graphify-graph-hint PreToolUse hook points Claude at it before raw-source
+# graphify-graph-hint SessionStart hook points Claude at it before raw-source
 # searches (Grep/Glob/grep), and the .claude/rules/graphify.md directive
 # reminds the agent to query it first.
 #

@@ -120,9 +120,9 @@ codebases. This toolkit wires it in:
 
 - **`scripts/graphify-bootstrap.sh [PATH]`** — builds the graph for a repo via
   `graphify update` (AST extraction; **no LLM, no API key**).
-- **`.claude/hooks/graphify-graph-hint.sh`** — a `PreToolUse(Bash | Glob | Grep)`
-  hook that, *once per session*, reminds the agent to query the graph before raw
-  source search. A silent no-op in repos without a graph.
+- **`.claude/hooks/graphify-graph-hint.sh`** — a `SessionStart` hook that reminds
+  the agent to query the graph before raw source search. A silent no-op in repos
+  without a graph.
 - **`.claude/rules/graphify.md`** — the always-loaded directive on querying the graph.
 
 ```bash

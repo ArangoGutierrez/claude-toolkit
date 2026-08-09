@@ -99,6 +99,10 @@
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/session-goal-init.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/graphify-graph-hint.sh"
           }
         ]
       }
@@ -116,19 +120,6 @@
             "type": "command",
             "command": "$HOME/.claude/hooks/prevent-push-workbench.sh",
             "if": "Bash(git push *)"
-          },
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/graphify-graph-hint.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Read|Glob|Grep",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/graphify-graph-hint.sh"
           }
         ]
       },

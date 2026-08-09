@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 # graphify-install.sh — install the Graphify Claude Code integration (hook + rule +
-# settings.json PreToolUse entries) into a Claude config dir. IDEMPOTENT: re-running
+# a settings.json SessionStart entry) into a Claude config dir. IDEMPOTENT: re-running
 # inserts nothing new and exits 0. NEVER clobbers existing hooks.
 #
 # Usage: graphify-install.sh [--target DIR] [--source DIR] [--dry-run]
@@ -47,25 +47,26 @@ else
 fi
 
 # 2) Idempotency: already registered? -> done.
-if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command // ""] | any(test("graphify-graph-hint"))' "$SETTINGS" >/dev/null; then
+if jq -e '[.hooks.SessionStart[]?.hooks[]?.command // ""] | any(test("graphify-graph-hint"))' "$SETTINGS" >/dev/null; then
   echo "graphify-install: settings.json already registers graphify-graph-hint; no settings change."
   exit 0
 fi
 
 if $DRY_RUN; then
-  echo "[dry-run] would back up $SETTINGS and add Bash + Glob|Grep PreToolUse blocks"
+  echo "[dry-run] would back up $SETTINGS and add a SessionStart block"
   exit 0
 fi
 
-# 3) Backup, then insert the two PreToolUse blocks.
+# 3) Backup, then insert the SessionStart block. SessionStart takes no matcher; it fires
+# on startup, resume, clear and compact. `+=` on an absent key starts from null, which
+# jq treats as the empty array, so a settings.json with no SessionStart still works.
 backup="$SETTINGS.bak-graphify-$(date +%Y%m%d-%H%M%S)"
 command cp -f "$SETTINGS" "$backup"
 
 tmpf="$(mktemp "${TMPDIR:-/tmp}/graphify-install.XXXXXX")"
 jq --arg cmd "$HOOK_CMD" '
-  .hooks.PreToolUse += [
-    {matcher:"Bash",      hooks:[{type:"command", command:$cmd}]},
-    {matcher:"Glob|Grep", hooks:[{type:"command", command:$cmd}]}
+  .hooks.SessionStart += [
+    {hooks:[{type:"command", command:$cmd}]}
   ]
 ' "$SETTINGS" > "$tmpf"
 
@@ -76,5 +77,5 @@ if ! jq -e . "$tmpf" >/dev/null 2>&1; then
 fi
 command mv -f "$tmpf" "$SETTINGS"
 
-echo "graphify-install: installed hook+rule and Bash + Glob|Grep PreToolUse blocks into $TARGET"
+echo "graphify-install: installed hook+rule and a SessionStart block into $TARGET"
 echo "  backup: $backup"

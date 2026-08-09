@@ -1,14 +1,26 @@
 #!/usr/bin/env bash
-# graphify-graph-hint.sh — global PreToolUse hook (register on matchers "Bash" and "Read|Glob|Grep").
+# graphify-graph-hint.sh — global SessionStart hook (no matcher; fires on startup, resume,
+# clear and compact).
 #
-# When the current project has a Graphify code graph (graphify-out/graph.json) and Claude is
-# about to do a raw source search/read, inject a one-line reminder to orient via `graphify query`
-# FIRST. Fires at most ONCE per session (avoids the stock per-call token spam) and is a silent
-# no-op in any repo without a graph. No NVIDIA/project specifics — fully generic & shareable.
+# When the current project has a Graphify code graph (graphify-out/graph.json), print a
+# reminder to orient via `graphify query` before grepping or reading raw source. A silent
+# no-op in any repo without a graph. Fully generic and shareable — no project specifics.
 #
-# Reads the PreToolUse JSON payload on stdin; emits hookSpecificOutput.additionalContext (the
-# same envelope Graphify's native hook uses) or nothing.
-set -euo pipefail
+# Why SessionStart and not PreToolUse: this was registered on the "Bash" and "Read|Glob|Grep"
+# matchers, so it forked on nearly every tool call — about 23 ms each even after its
+# once-per-session marker was set, since it still had to re-read that marker. A 300-call
+# session paid roughly 7 seconds to deliver one message. SessionStart pays that cost once,
+# and the hint lands BEFORE the first search rather than racing it.
+#
+# The once-per-session marker file is deliberately GONE, not kept as a guard. It existed only
+# to suppress the per-call spam. SessionStart fires a handful of times per session, and each
+# fire is a context boundary: a compact or a clear drops the earlier hint, so a marker keyed
+# on the session id would swallow the repeat exactly when the hint is needed again.
+#
+# Reads the SessionStart JSON payload on stdin. Writes the hint to stdout, which Claude Code
+# adds to the session context — the same contract inject-date.sh and session-goal-init.sh use.
+# Exits 0 always; never blocks session start.
+set -uo pipefail
 
 payload="$(cat 2>/dev/null || true)"
 
@@ -19,55 +31,11 @@ if [ -z "$proj" ] && [ -n "$payload" ]; then
 fi
 proj="${proj:-$PWD}"
 
-# Guard: no graph -> silent no-op. (|| exit is set -e safe.)
+# Guard: no graph -> silent no-op.
 [ -f "$proj/graphify-out/graph.json" ] || exit 0
 
-tool="$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null || true)"
+cat <<'EOF'
+graphify: a code knowledge graph exists (graphify-out/graph.json). Before grepping/reading raw source to understand this codebase, orient first with `graphify query "<question>"` (scoped subgraph), `graphify explain "<concept>"`, or `graphify path "<A>" "<B>"`. Read graphify-out/GRAPH_REPORT.md only for broad architecture review. Then search/read raw files for specifics. Applies to subagents too.
+EOF
 
-# Is this a "search/read raw source to understand the codebase" action?
-relevant=0
-case "$tool" in
-  Bash)
-    cmd="$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null || true)"
-    case "$cmd" in
-      *grep*|*"rg "*|*ripgrep*|*"find "*|*"fd "*|*"ack "*|*"ag "*) relevant=1 ;;
-    esac
-    ;;
-  Read|Glob)
-    target="$(printf '%s' "$payload" \
-      | jq -r '[.tool_input.file_path, .tool_input.pattern, .tool_input.path] | map(select(. != null)) | join(" ")' 2>/dev/null \
-      | tr 'A-Z' 'a-z' || true)"
-    case "$target" in
-      *graphify-out/*) exit 0 ;;  # reading the graph itself is not "raw source"
-    esac
-    for e in .ts .tsx .js .jsx .go .rs .py .java .rb .c .h .cpp .hpp .cc .cs .kt .swift .php .scala .lua .sh .md .rst .mdx; do
-      case "$target" in *"$e"*) relevant=1; break ;; esac
-    done
-    ;;
-  Grep)
-    # The dedicated Grep tool is always a raw-source content search.
-    gtarget="$(printf '%s' "$payload" \
-      | jq -r '[.tool_input.path, .tool_input.glob] | map(select(. != null)) | join(" ")' 2>/dev/null \
-      | tr 'A-Z' 'a-z' || true)"
-    case "$gtarget" in
-      *graphify-out/*) exit 0 ;;  # searching the graph itself is not "raw source"
-    esac
-    relevant=1
-    ;;
-esac
-[ "$relevant" = 1 ] || exit 0
-
-# Once-per-session: keyed by session id (env first, then payload), in a temp marker.
-sid="${CLAUDE_SESSION_ID:-}"
-if [ -z "$sid" ] && [ -n "$payload" ]; then
-  sid="$(printf '%s' "$payload" | jq -r '.session_id // empty' 2>/dev/null || true)"
-fi
-sid="${sid:-nosession}"
-marker="${TMPDIR:-/tmp}/claude-graphify-surfaced-${sid}"
-if [ -f "$marker" ]; then
-  exit 0
-fi
-: > "$marker"
-
-msg="graphify: a code knowledge graph exists (graphify-out/graph.json). Before grepping/reading raw source to understand this codebase, orient first with \`graphify query \"<question>\"\` (scoped subgraph), \`graphify explain \"<concept>\"\`, or \`graphify path \"<A>\" \"<B>\"\`. Read graphify-out/GRAPH_REPORT.md only for broad architecture review. Then search/read raw files for specifics. Applies to subagents too."
-jq -n --arg ctx "$msg" '{hookSpecificOutput:{hookEventName:"PreToolUse",additionalContext:$ctx}}'
+exit 0

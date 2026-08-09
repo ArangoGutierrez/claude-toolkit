@@ -86,6 +86,73 @@ depending on scope flags). Pass `--force` to skip the backup step.
 ./scripts/deploy.sh --delete       # sync exactly — remove live files absent from repo
 ```
 
+### Overlay repos
+
+Some people layer a second config repo — private, or team-specific — on top of this
+one. `deploy.sh` must not overwrite the files that repo owns. Point it at the overlay
+with `scripts/deploy-overlay.local`, a single line holding the overlay repo's absolute
+path. That file is machine-local and gitignored.
+
+Every `.claude/` path the overlay **tracks** is then excluded from the deploy. The
+exclusion set is computed live from the overlay's git index on each run, never from a
+stored snapshot. It fails closed: a pointer naming a directory that is missing, or that
+is not a git repo, aborts the deploy with exit code `4` rather than deploying over
+overlay-owned paths. With no pointer file, none of this applies.
+
+#### Declaring deletions
+
+Tracking cannot express a deletion, and that gap is a trap worth understanding.
+
+An overlay file is excluded *because the overlay tracks it*. Delete that file from the
+overlay and it stops being tracked, so it stops being excluded — and the next deploy
+writes this repo's copy back into `~/.claude/`. **The deletion silently undoes itself.**
+
+To make a deletion stick, list it in a manifest at the overlay repo's root, named:
+
+```text
+.claude-deploy-deletions
+```
+
+One repo-relative path per line:
+
+```text
+# Paths this overlay deliberately removes. The toolkit must not restore them.
+.claude/agents/doc-writer.md
+.claude/rules/report-style.md
+```
+
+| Case | Behaviour |
+|------|-----------|
+| Manifest absent | No-op — the deploy behaves exactly as it does without one. Most overlays never need a manifest |
+| Manifest empty | No-op, not an error |
+| Blank line | Ignored |
+| `#` as the first non-blank character | The whole line is a comment. This is gitignore's rule, so a `#` inside a filename is never mistaken for one |
+| Whitespace around an entry | Trimmed |
+| Entry not starting with `.claude/` | Aborts with exit `4`. A manifest that can exclude arbitrary paths is a footgun |
+| Entry containing a `..` segment | Aborts with exit `4` |
+| Entry the overlay still tracks | Warns on stderr, then excludes it anyway. Either the entry is redundant or the deletion was never actually made |
+
+Entries are anchored at the transfer root the same way tracked paths are, so
+`.claude/rules/report-style.md` excludes exactly that file and not a same-named file
+somewhere deeper.
+
+The manifest lives in the overlay repo on purpose. It is versioned in the same commit
+as the deletion it describes, so the two cannot drift apart. A list kept next to the
+pointer instead would be machine-local state that a human has to remember to update —
+which is the failure this feature exists to prevent. `deploy.sh` reads the working-tree
+copy, so a manifest edit takes effect immediately; commit it so other machines get it
+too.
+
+Deploy output reports the two sources on separate lines, so the tracked-path count
+keeps its original meaning:
+
+```text
+>> overlay: excluding 34 overlay-owned paths (from /path/to/overlay)
+>> overlay: honouring 2 declared deletion(s) (from /path/to/overlay/.claude-deploy-deletions)
+```
+
+The second line appears only when the manifest contributes at least one entry.
+
 ---
 
 ## capture.sh

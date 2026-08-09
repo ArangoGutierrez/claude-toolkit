@@ -78,6 +78,11 @@ A timestamped backup is created automatically before any files are overwritten.
 > toolkit, then own it locally (your machine-specific hooks and env live
 > there). This prevents toolkit deploys from clobbering local registrations.
 
+**Layering a private repo on top?** `deploy.sh` can treat a second repo as the
+owner of the `.claude/` paths it tracks, and honour the paths that repo
+deliberately deletes — a deletion the toolkit would otherwise restore on the
+next deploy. See [Overlay repos](docs/deployment.md#overlay-repos).
+
 See [Getting Started](docs/getting-started.md) for prerequisites, verification
 steps, and a first-session walkthrough.
 

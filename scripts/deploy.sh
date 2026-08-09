@@ -65,6 +65,13 @@ CURSOR_EXCLUDES=(
 # computed LIVE from the overlay's git index at deploy time — never a
 # snapshot. Fail-closed: a configured-but-unresolvable overlay aborts the
 # deploy (exit 4); an absent pointer is a no-op (upstream-only installs).
+#
+# Tracking alone cannot express a DELETION: an overlay that removes a file
+# stops tracking it, which drops its exclusion, so this repo deploys its own
+# copy back and the deletion undoes itself. The overlay declares the deletions
+# it means in a manifest at its root ($OVERLAY_DELETIONS_MANIFEST) — versioned
+# in the overlay beside the deletions it describes, never machine-local state.
+OVERLAY_DELETIONS_MANIFEST=".claude-deploy-deletions"
 OVERLAY_EXCLUDE_FILE=""
 trap 'rm -f "${OVERLAY_EXCLUDE_FILE:-}"' EXIT
 
@@ -90,6 +97,44 @@ build_overlay_excludes() {
   local n
   n="$(wc -l < "$OVERLAY_EXCLUDE_FILE" | tr -d ' ')"
   echo ">> overlay: excluding $n overlay-owned paths (from $overlay_repo)"
+  append_overlay_deletions "$overlay_repo" "$listing"
+}
+
+# Append the overlay's declared deletions to the exclude file. The manifest is
+# one repo-relative path per line; blank lines and lines whose first non-space
+# character is '#' are ignored (gitignore's comment rule, so a '#' inside a
+# filename is never mistaken for one). Entries must name a path under .claude/
+# and must not traverse upward — an exclude list that reaches arbitrary paths
+# would silently shadow unrelated files, so a bad entry aborts fail-closed.
+append_overlay_deletions() {
+  local overlay_repo="$1" listing="$2"
+  local manifest="$overlay_repo/$OVERLAY_DELETIONS_MANIFEST"
+  [[ -f "$manifest" ]] || return 0
+  local line entry declared=0
+  # `|| [[ -n "$line" ]]` so a final line without a trailing newline still counts.
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    entry="$(printf '%s' "$line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [[ -z "$entry" || "${entry:0:1}" == "#" ]] && continue
+    if [[ "$entry" != .claude/?* ]]; then
+      echo "ERROR: overlay deletion manifest $manifest: entry must start with '.claude/': '$entry'" >&2
+      exit 4
+    fi
+    case "/$entry/" in
+      */../*)
+        echo "ERROR: overlay deletion manifest $manifest: entry must not contain '..': '$entry'" >&2
+        exit 4 ;;
+    esac
+    if printf '%s\n' "$listing" | grep -qxF "$entry"; then
+      echo "WARNING: overlay deletion manifest lists a still-tracked path: $entry" >&2
+    fi
+    # Same leading-slash anchoring the tracked paths get: an unanchored rsync
+    # pattern matches at ANY depth and would over-exclude same-named files.
+    printf '%s\n' "${entry#.claude}" >> "$OVERLAY_EXCLUDE_FILE"
+    declared=$((declared + 1))
+  done < "$manifest"
+  if [[ $declared -gt 0 ]]; then
+    echo ">> overlay: honouring $declared declared deletion(s) (from $manifest)"
+  fi
 }
 
 # --- Defaults ---

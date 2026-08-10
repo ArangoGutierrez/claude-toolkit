@@ -126,9 +126,14 @@ local counter that never reaches it, and `deadFinders`/`attemptedFinders` are se
 to compare against. Three checks that DO work:
 
 1. **Read the run log, not the return value.** Finders dispatch with
-   `label: 'review:<first word of the dimension>'` (`:89`), so N dimensions must
-   produce N `review:*` entries. A missing label is a dead finder. This is the
-   only place the information exists.
+   `label: 'review:<first word of the dimension>'` — literally
+   `review:${dim.split(/[\s:]/)[0]}` (`:89`) — so N dimensions must produce N
+   `review:*` entries. A missing label is a dead finder. This is the only place
+   the information exists.
+   ⚠️ **Therefore: give every dimension a DISTINCT first word.** Two dimensions
+   starting with the same word collapse to a single label, and the check silently
+   degrades into the exact blind spot it exists to close. Write out the labels your
+   dimension list will produce and confirm they are unique *before* dispatching.
 2. **Treat an empty `confirmed` on a substantial diff as suspicious** — re-run
    before believing it.
 3. **Never let `review-verify` be the sole gate.** The acceptance command and the

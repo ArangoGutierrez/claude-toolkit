@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Generate a structured handoff prompt to start a fresh session with full context. Use when context window approaches limit or before ending a long session.
+description: Generate a structured handoff prompt to start a fresh session with full context. Use when context window approaches limit or before ending a long session. `/handoff --epic` instead produces an epic-launch brief for a session that must drive a large goal to completion autonomously.
 user-invocable: true
 tools:
   - Bash
@@ -154,6 +154,52 @@ After writing, print the full document to stdout with this header:
 ```
 
 Then print the document content.
+
+## Epic-launch mode — `/handoff --epic`
+
+A different genre from the session handoff above. The session-resumption handoff
+answers *"what was I doing?"*. An epic-launch handoff answers *"here is a large
+goal — drive it to completion autonomously."* The receiving session runs for
+hours, dispatches subagents, and opens many PRs, so it needs the **mechanism**,
+not only the context.
+
+Use this mode when the receiving session will:
+- execute a multi-PR epic rather than resume in-flight work, **and**
+- dispatch subagents rather than do the work in one context, **and**
+- run with bypass-permissions or otherwise unattended for long stretches.
+
+### Required sections, in addition to the standard ones
+
+1. **Mission + definition of done** — what "finished" means, objectively.
+2. **Verified ground truth** — facts the session must NOT re-derive, each with the
+   command that produced it. This is the highest-value part of the document:
+   every hour spent verifying here is an hour the receiving session does not
+   spend rediscovering, and a claim carried without its command is a liability.
+3. **Execution loop** — paste and adapt `references/epic-execution-loop.md`.
+   **Do not omit it and do not paraphrase away its exit conditions or bounds.**
+   It carries the DAG/wave decomposition, the `chief-dispatch` critic gate, the
+   per-task exit condition, `review-verify` before any external review, the
+   loop-until-dry completeness critic, and the standing triggers.
+4. **Constraints and gates** — what the session may never do unattended. At
+   minimum: never post externally without per-action user approval, never merge,
+   and the repo's own PR-size and commit conventions.
+5. **Ordered first actions** — front-load work that has no cross-session
+   dependency, so the session never idles waiting on a peer.
+
+### Authoring rules
+
+- **Verify every literal before it ships.** Commands, paths, line numbers, counts
+  and tool/workflow names in a handoff are untested code. Check each against the
+  branch the work will actually run on — not whichever checkout happens to be
+  open. This is the single most common defect in these documents.
+- **Prefer executed evidence to cited evidence.** "I ran X, here is the output"
+  outranks "the file says X". A citation proves the code *says* something, not
+  that it *does* it.
+- **State blind spots explicitly** — unreadable paths, stale graphs, assumptions
+  established by inspection rather than execution. A named gap is safe; a silent
+  one is not.
+- **Name the epic's specific failure mode** for the `review-verify` dimension.
+  The generic three dimensions are table stakes; the fourth is where the value is.
 
 ## Limitations
 

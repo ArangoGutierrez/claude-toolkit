@@ -114,11 +114,29 @@ The epic-specific dimension is the important one — name the way *this* work
 fails, not the generic three.
 
 ⚠️ **A silent pass is not a clean pass.** Verified 2026-08-10: `review-verify`
-sets `out.error` **only when every finder dies** (`liveFinders === 0`). If three
-of four finders die and the fourth returns clean, the result is an empty
-`confirmed` array with **no error** — identical in shape to a genuinely clean
-review. Before believing a clean result, confirm the number of finders that
-returned equals the number of dimensions requested. **Silence is not safety.**
+sets `out.error` **only when every finder dies** (`liveFinders === 0`,
+`review-verify.js:119`). If three of four finders die and the fourth returns
+clean, the result is an empty `confirmed` array with **no error** — identical in
+shape to a genuinely clean review.
+
+**And the obvious check is not executable.** The return object is
+`{ target, dimensions, confirmed, refutedCount }` (`:113`); `liveFinders` is a
+local counter that never reaches it, and `deadFinders`/`attemptedFinders` are set
+*only* in the all-dead branch. On a partial death there is no count in the result
+to compare against. Three checks that DO work:
+
+1. **Read the run log, not the return value.** Finders dispatch with
+   `label: 'review:<first word of the dimension>'` (`:89`), so N dimensions must
+   produce N `review:*` entries. A missing label is a dead finder. This is the
+   only place the information exists.
+2. **Treat an empty `confirmed` on a substantial diff as suspicious** — re-run
+   before believing it.
+3. **Never let `review-verify` be the sole gate.** The acceptance command and the
+   suite are independent evidence that does not share its failure mode.
+
+**Silence is not safety.** This entry exists because the first version of this
+block told sessions to compare a field that does not exist in the return — a
+reminder that a mitigation is untested code until someone runs it.
 
 ## 5. Completeness critic — loop until dry
 

@@ -127,6 +127,26 @@ def test_blinded_personas_ask_for_choice_not_verdict(role):
     assert "recommended" not in combined.lower(), (
         f"{role} persona must not mention a recommendation - it is blinded"
     )
+    # The anti-paraphrase wording is load-bearing, not boilerplate.
+    # aggregate._map_blinded_choice compares CHOICE to the recommended label by
+    # EXACT string equality after marker-strip and case-fold. A panelist that
+    # agrees but abbreviates, paraphrases, or invents a label scores as
+    # OVERTURN. Delete these sentences and a unanimously agreeing panel reports
+    # as unanimously dissenting, with the rest of the suite still green.
+    # Whitespace-collapsed so the guard tracks the WORDING, not where the
+    # author happened to wrap a line - these sentences straddle line breaks.
+    flat = " ".join(combined.split())
+    for required in (
+        "literal copy",
+        "Do not abbreviate.",
+        "Do not paraphrase.",
+        "Do not invent an option that is not in the list.",
+    ):
+        assert required in flat, (
+            f"{role} persona must keep the anti-paraphrase instruction "
+            f"{required!r}: CHOICE is matched by exact string equality, so a "
+            f"reworded agreement is recorded as a dissent"
+        )
 
 
 def test_da_persona_still_asks_for_a_verdict():

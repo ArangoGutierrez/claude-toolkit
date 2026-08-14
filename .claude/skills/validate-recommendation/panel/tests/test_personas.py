@@ -112,3 +112,25 @@ def test_one_shot_example_is_optional(tmp_path):
     persona = load_persona(p)
     assert persona.role == "SEC"
     assert persona.one_shot_example == ""
+
+
+import pytest
+from panel.personas import load_persona_by_role
+
+
+@pytest.mark.parametrize("role", ["PE", "QA"])
+def test_blinded_personas_ask_for_choice_not_verdict(role):
+    p = load_persona_by_role(role)
+    combined = p.system_prompt + p.one_shot_example + p.user_prompt_template
+    assert "CHOICE:" in combined, f"{role} persona must request a CHOICE line"
+    assert "VERDICT:" not in combined, f"{role} persona must not request a VERDICT"
+    assert "recommended" not in combined.lower(), (
+        f"{role} persona must not mention a recommendation - it is blinded"
+    )
+
+
+def test_da_persona_still_asks_for_a_verdict():
+    p = load_persona_by_role("DA")
+    combined = p.system_prompt + p.one_shot_example + p.user_prompt_template
+    assert "VERDICT:" in combined
+    assert "CHOICE:" not in combined

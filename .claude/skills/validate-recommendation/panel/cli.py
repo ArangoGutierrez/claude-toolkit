@@ -66,6 +66,20 @@ def main(argv: list[str] | None = None) -> int:
     )
     disp.add_argument("--output", required=True, help="Verdict file output path")
 
+    bp = sub.add_parser(
+        "build-prompt", help="Build a panelist prompt body (blinded per config)"
+    )
+    bp.add_argument("--panelist", required=True, help="Panelist id from config.yml")
+    bp.add_argument(
+        "--config", default=None,
+        help="Path to config.yml (default: ~/.claude/panel/config.yml)",
+    )
+    bp.add_argument(
+        "--question-file", required=True,
+        help="JSON file: {question, options:[{label,description}], recommended_label, reasoning}",
+    )
+    bp.add_argument("--output", required=True, help="Prompt body output path")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "aggregate":
@@ -105,6 +119,26 @@ def main(argv: list[str] | None = None) -> int:
             prompt_file=args.prompt_file,
             output=args.output,
         )
+
+    if args.cmd == "build-prompt":
+        import json as _json
+        from panel.config import load_config
+        from panel.prompt import build_prompt_body
+        cfg = load_config(args.config or _default_config_path())
+        match = [p for p in cfg.panelists if p.id == args.panelist]
+        if not match:
+            print(f"panel: no such panelist: {args.panelist}", file=sys.stderr)
+            return 1
+        payload = _json.loads(Path(args.question_file).read_text(encoding="utf-8"))
+        body = build_prompt_body(
+            payload["question"],
+            [(o["label"], o["description"]) for o in payload["options"]],
+            payload["recommended_label"],
+            payload.get("reasoning", "(no reasoning supplied)"),
+            blind=match[0].blind,
+        )
+        Path(args.output).write_text(body, encoding="utf-8")
+        return 0
 
     parser.error(f"unknown command: {args.cmd}")
     return 2

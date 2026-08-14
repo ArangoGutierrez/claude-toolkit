@@ -157,6 +157,14 @@ QPAYLOAD="${TMPDIR:-/tmp}/panel-question-${CLAUDE_SESSION_ID:-$PPID}-q<N>.json"
 # reasoning comes from the recommended option's description; if there is
 # none, use "(no reasoning supplied)". NEVER invent hidden reasoning.
 
+# The cd is load-bearing, exactly as in the lint-config, dispatch and
+# aggregate blocks. $PYTHONPATH is $HOME/.claude, so from any other cwd
+# `python -m panel` resolves `panel` to ~/.claude/panel — the CONFIG
+# directory — which has no __init__.py and shadows the real package as a
+# namespace package. The call then dies with "No module named
+# panel.__main__" and writes no prompt file at all.
+cd "${HOME}/.claude/skills/validate-recommendation"
+
 for PID in <each enabled panelist id>; do
   "${CLAUDE_PANEL_PYTHON:-python3.12}" -m panel build-prompt \
     --panelist "$PID" \

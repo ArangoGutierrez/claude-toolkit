@@ -10,9 +10,11 @@ augmented with panelist reasoning), or **ERROR** (re-ask the original
 question — a panelist failed to respond usefully). The panel's behavior is
 entirely driven by one file, `config.yml`.
 
-At the wire level each panelist emits HOLD or OVERTURN (see the worked
-example); the aggregator maps OVERTURN votes into SOFT-DISSENT or
-HARD-DISSENT by the severity threshold.
+At the wire level an unblinded panelist emits HOLD or OVERTURN (see the worked
+example) and a blinded one emits a CHOICE, which the aggregator maps onto the
+same two votes: agreement with the recommended option is HOLD, any other
+choice is OVERTURN naming that option. The aggregator then maps OVERTURN votes
+into SOFT-DISSENT or HARD-DISSENT by the severity threshold.
 
 ## How
 
@@ -22,6 +24,13 @@ Copy the template into place and adjust it:
 cp .claude/panel/config.yml.template ~/.claude/panel/config.yml
 ```
 
+The template ships three enabled panelists: an adversarial `DA`, which is told
+which option was recommended and argues against it, plus a blinded `PE` and
+`QA`, which are not told and rank the options on their merits. Three is the
+smallest odd N at which a single dissenting panelist produces a SOFT-DISSENT
+rather than a hard interrupt. Set `CLAUDE_PANEL_PROFILE=solo` to fall back to
+`DA` alone for one dispatch.
+
 Each entry under `panelists:` is independent:
 
 | Field | Meaning |
@@ -29,10 +38,16 @@ Each entry under `panelists:` is independent:
 | `id` | short identifier used in trace/telemetry output |
 | `role` | `DA` (devil's advocate), `PE` (principal engineer), `QA`, or a custom role |
 | `enabled` | panelists can be toggled off without deleting their config |
+| `blind` | withhold the recommendation from this panelist (`claude-subagent` only) |
 | `backend` | `nat-openai`, `nat-anthropic`, `nat-nim`, or `claude-subagent` |
 | `model` | catalog ID (only for the three `nat-*` backends) |
 | `subagent_type` | which agent definition to spawn (only for `claude-subagent`) |
 | `max_tokens`, `temperature`, `timeout_seconds` | per-panelist request tuning |
+
+A blinded panelist gets a prompt with the recommendation removed, the
+`(Recommended)` marker stripped from every label, and the options
+deterministically reordered — it cannot tell which option the assistant
+favoured, so its agreement is evidence rather than an echo.
 
 Two other blocks matter beyond the panelist list: `severity.hard_threshold`
 (how many panelists must agree to force a re-ask) and `re_brainstorm`
@@ -51,12 +66,21 @@ in-process as a spawned agent.
 
 ## Pitfalls
 
+- **`blind` must match the panelist's persona.** A blinded panelist never sees
+  the recommendation, so its persona asks for `CHOICE: <option label>`; an
+  unblinded one judges a named recommendation and answers
+  `VERDICT: HOLD|OVERTURN`. `panel lint-config` cross-checks the two and exits
+  non-zero on a mismatch, because the runtime failure is silent: a reply
+  carrying no `VERDICT:` line is scored ERROR for that panelist on every
+  question. Blinding is supported on the `claude-subagent` backend only —
+  `blind: true` on a `nat-*` panelist is rejected at config load.
 - **Cost note for `claude-subagent` panelists.** A `claude-subagent` panelist
   is a full agent dispatch (its own context window, tool calls, reasoning
-  turns), not a single completion request. Enabling `PE`/`QA` panelists
-  (disabled by default in the template) multiplies the cost of every paneled
-  question by roughly an agent invocation each — reserve them for genuinely
-  high-stakes design forks, not routine `(Recommended)` options.
+  turns), not a single completion request. The template enables two of them,
+  so every paneled question costs roughly two agent invocations on top of the
+  `DA` request. For a cheaper run, set `CLAUDE_PANEL_PROFILE=solo` for one
+  dispatch, or `enabled: false` on `PE`/`QA` permanently — but note that at
+  N=1 the majority threshold makes every single OVERTURN a hard interrupt.
 - **`enabled: false` is not the same as deleting the entry.** Config stays in
   place so panelists can be toggled back on without re-typing the block; a
   disabled panelist still needs valid `backend`/`model` fields if it's ever

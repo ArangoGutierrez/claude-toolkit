@@ -130,12 +130,15 @@ def main(argv: list[str] | None = None) -> int:
             print(f"panel: no such panelist: {args.panelist}", file=sys.stderr)
             return 1
         payload = _json.loads(Path(args.question_file).read_text(encoding="utf-8"))
+        blinded = match[0].blind
         body = build_prompt_body(
             payload["question"],
             [(o["label"], o["description"]) for o in payload["options"]],
-            payload["recommended_label"],
-            payload.get("reasoning", "(no reasoning supplied)"),
-            blind=match[0].blind,
+            payload.get("recommended_label", ""),
+            # A blinded panelist must never receive the reasoning. Drop it here;
+            # build_prompt_body refuses the build outright if it arrives anyway.
+            "" if blinded else payload.get("reasoning", "(no reasoning supplied)"),
+            blind=blinded,
         )
         Path(args.output).write_text(body, encoding="utf-8")
         return 0

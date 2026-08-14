@@ -6,7 +6,10 @@ code rather than as an instruction in SKILL.md: an instruction not to
 mention the recommendation cannot be verified and fails silently.
 
 Blinding does three things:
-  1. omits the recommendation and its stated reasoning entirely,
+  1. omits the recommendation entirely, and REFUSES to build at all when a
+     caller hands it the assistant's stated reasoning. Omission alone was a
+     side effect of which lines the formatter appends; a checked precondition
+     turns a silent leak into a loud error,
   2. strips the "(Recommended)" / "(Recommended; Panel-flagged)" markers
      from every displayed label,
   3. rotates option order deterministically, so the recommended option is
@@ -47,7 +50,14 @@ def build_prompt_body(
     """Build the user prompt body sent to one panelist.
 
     options is a list of (label, description) in their original order.
+
+    Raises ValueError when a blinded build is handed a non-empty reasoning.
     """
+    if blind and reasoning:
+        raise ValueError(
+            "blinded panelists must not receive the assistant's stated reasoning"
+        )
+
     lines = [f"Question: {question}", "Options (verbatim labels and descriptions):"]
 
     if not blind:

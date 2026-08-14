@@ -10,6 +10,12 @@ version: 1
 # PRIVACY: OpenRouter :free routes may log prompts for provider training;
 # use a paid route or a self-hosted endpoint for sensitive work.
 
+# The default panel is three: one adversarial reviewer (DA), which is told
+# which option was recommended and argues against it, plus two blinded
+# reviewers (PE and QA), which are never told and rank the options on their
+# merits. Three is the smallest N at which a lone dissenting seat produces a
+# SOFT-DISSENT instead of a hard interrupt. Keep the enabled count odd.
+# Set CLAUDE_PANEL_PROFILE=solo to fall back to DA alone for one dispatch.
 panelists:
   - id: da
     role: DA
@@ -22,13 +28,15 @@ panelists:
 
   - id: pe
     role: PE
-    enabled: false            # opt-in: spawns a Claude subagent
+    enabled: true
+    blind: true               # never sees which option was recommended
     backend: claude-subagent
     subagent_type: principal-engineer
 
   - id: qa
     role: QA
-    enabled: false            # opt-in
+    enabled: true
+    blind: true               # never sees which option was recommended
     backend: claude-subagent
     subagent_type: qa-engineer
 

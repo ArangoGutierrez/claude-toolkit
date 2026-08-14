@@ -23,6 +23,7 @@ class Verdict:
     verdict: str  # "HOLD" | "OVERTURN" | "" (empty means unparseable)
     rationale: str
     alternative: str
+    choice: str = ""  # set by blinded panelists instead of verdict/alternative
 
 
 def _first_field(lines: list[str], field: str) -> str:
@@ -45,6 +46,7 @@ def parse_verdict(text: str) -> Verdict:
         verdict=_first_field(lines, "VERDICT"),
         rationale=_first_field(lines, "RATIONALE"),
         alternative=_first_field(lines, "ALTERNATIVE"),
+        choice=_first_field(lines, "CHOICE"),
     )
 
 

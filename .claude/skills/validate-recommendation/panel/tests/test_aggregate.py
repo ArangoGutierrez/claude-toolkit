@@ -13,6 +13,8 @@ import textwrap
 
 import pytest
 
+from panel.aggregate import aggregate
+
 
 @pytest.fixture
 def cfg_path_n1(tmp_path):
@@ -62,6 +64,36 @@ def _write_verdict(verdicts_dir, panelist_id, verdict, rationale, alternative):
         f"RATIONALE: {rationale}\n"
         f"ALTERNATIVE: {alternative}\n"
     )
+
+
+def _write_blind_config(tmp_path):
+    """N=1 blinded PE, plus a DA seat, for mapping tests. Only the panelist
+    under test gets a verdict file; the other becomes ERROR, which is fine
+    because these tests assert on the per-panelist row, not the directive."""
+    cfg_file = tmp_path / "config.yml"
+    cfg_file.write_text(
+        "version: 1\n"
+        "panelists:\n"
+        "  - id: da\n"
+        "    role: DA\n"
+        "    enabled: true\n"
+        "    backend: nat-nim\n"
+        "    model: m\n"
+        "  - id: pe\n"
+        "    role: PE\n"
+        "    enabled: true\n"
+        "    backend: claude-subagent\n"
+        "    subagent_type: principal-engineer\n"
+        "    blind: true\n"
+        "  - id: qa\n"
+        "    role: QA\n"
+        "    enabled: true\n"
+        "    backend: claude-subagent\n"
+        "    subagent_type: qa-engineer\n"
+        "    blind: true\n",
+        encoding="utf-8",
+    )
+    return cfg_file
 
 
 def test_n1_hold_emits_hold_json(tmp_path, cfg_path_n1):
@@ -258,3 +290,69 @@ def test_recommended_label_is_not_interpolated_into_summary(tmp_path, cfg_path_n
     assert "(Recommended)" not in data["summary"]
     assert "net/http" not in data["summary"]
     assert "stdlib" not in data["summary"]
+
+
+def test_blinded_choice_matching_recommendation_maps_to_hold(tmp_path):
+    cfg_path = _write_blind_config(tmp_path)
+    vdir = tmp_path / "v"
+    vdir.mkdir()
+    (vdir / "pe.verdict").write_text(
+        "CHOICE: Use net/http\nRATIONALE: stdlib is enough\n", encoding="utf-8"
+    )
+    out = json.loads(aggregate(str(cfg_path), str(vdir), "Use net/http (Recommended)"))
+    row = [p for p in out["panelists"] if p["id"] == "pe"][0]
+    assert row["verdict"] == "HOLD"
+    assert row["alternative"] == "n/a"
+
+
+def test_blinded_choice_differing_maps_to_overturn_with_alternative(tmp_path):
+    cfg_path = _write_blind_config(tmp_path)
+    vdir = tmp_path / "v"
+    vdir.mkdir()
+    (vdir / "pe.verdict").write_text(
+        "CHOICE: Use resty\nRATIONALE: retries matter\n", encoding="utf-8"
+    )
+    out = json.loads(aggregate(str(cfg_path), str(vdir), "Use net/http (Recommended)"))
+    row = [p for p in out["panelists"] if p["id"] == "pe"][0]
+    assert row["verdict"] == "OVERTURN"
+    assert row["alternative"] == "Use resty"
+
+
+def test_blinded_choice_is_marker_insensitive(tmp_path):
+    """The panelist saw a marker-stripped label; the recommendation carries
+    the marker. Matching must ignore it or every blinded HOLD becomes an
+    OVERTURN against itself."""
+    cfg_path = _write_blind_config(tmp_path)
+    vdir = tmp_path / "v"
+    vdir.mkdir()
+    (vdir / "pe.verdict").write_text(
+        "CHOICE:   use NET/HTTP  \nRATIONALE: stdlib is enough\n", encoding="utf-8"
+    )
+    out = json.loads(aggregate(str(cfg_path), str(vdir), "Use net/http (Recommended)"))
+    row = [p for p in out["panelists"] if p["id"] == "pe"][0]
+    assert row["verdict"] == "HOLD"
+
+
+def test_blinded_panelist_with_no_choice_line_becomes_error(tmp_path):
+    cfg_path = _write_blind_config(tmp_path)
+    vdir = tmp_path / "v"
+    vdir.mkdir()
+    (vdir / "pe.verdict").write_text("I refuse to answer\n", encoding="utf-8")
+    out = json.loads(aggregate(str(cfg_path), str(vdir), "Use net/http (Recommended)"))
+    row = [p for p in out["panelists"] if p["id"] == "pe"][0]
+    assert row["verdict"] == "ERROR"
+
+
+def test_unblinded_panelist_still_parses_verdict_lines(tmp_path):
+    """Regression guard: the mapping must not touch unblinded panelists."""
+    cfg_path = _write_blind_config(tmp_path)
+    vdir = tmp_path / "v"
+    vdir.mkdir()
+    (vdir / "da.verdict").write_text(
+        "VERDICT: OVERTURN\nRATIONALE: flawed\nALTERNATIVE: Use resty\n",
+        encoding="utf-8",
+    )
+    out = json.loads(aggregate(str(cfg_path), str(vdir), "Use net/http (Recommended)"))
+    row = [p for p in out["panelists"] if p["id"] == "da"][0]
+    assert row["verdict"] == "OVERTURN"
+    assert row["alternative"] == "Use resty"

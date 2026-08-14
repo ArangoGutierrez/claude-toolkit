@@ -356,3 +356,81 @@ def test_unblinded_panelist_still_parses_verdict_lines(tmp_path):
     row = [p for p in out["panelists"] if p["id"] == "da"][0]
     assert row["verdict"] == "OVERTURN"
     assert row["alternative"] == "Use resty"
+
+
+def test_blinded_choice_echoing_the_marker_maps_to_hold(tmp_path):
+    """A panelist that copies the label INCLUDING the marker still means HOLD.
+
+    strip_marker runs on BOTH sides of the comparison. Dropping it from the
+    panelist's own choice leaves every other blinded test green, because none
+    of them feed a marker-bearing CHOICE. Without this case, that mutation
+    survives and a panelist that agreed verbatim is recorded as dissenting.
+    """
+    cfg_path = _write_blind_config(tmp_path)
+    vdir = tmp_path / "v"
+    vdir.mkdir()
+    (vdir / "pe.verdict").write_text(
+        "CHOICE: Use net/http (Recommended)\nRATIONALE: stdlib is enough\n",
+        encoding="utf-8",
+    )
+    out = json.loads(aggregate(str(cfg_path), str(vdir), "Use net/http (Recommended)"))
+    row = [p for p in out["panelists"] if p["id"] == "pe"][0]
+    assert row["verdict"] == "HOLD"
+    assert row["alternative"] == "n/a"
+
+
+def test_blinded_and_unblinded_rows_coexist_in_one_directive(tmp_path):
+    """The blind flag is honoured per panelist, not per directive.
+
+    Every other blinded test leaves the unblinded seat as a missing-file
+    ERROR, so nothing pins that both contracts are parsed in the same run.
+    Treating all seats as unblinded turns pe/qa into ERROR (no VERDICT line);
+    treating all seats as blinded turns da into ERROR (no CHOICE line).
+    """
+    cfg_path = _write_blind_config(tmp_path)
+    vdir = tmp_path / "v"
+    vdir.mkdir()
+    # da is NOT blinded: it speaks the VERDICT contract.
+    (vdir / "da.verdict").write_text(
+        "VERDICT: OVERTURN\nRATIONALE: retries matter\nALTERNATIVE: Use resty\n",
+        encoding="utf-8",
+    )
+    # pe and qa ARE blinded: they speak the CHOICE contract.
+    (vdir / "pe.verdict").write_text(
+        "CHOICE: Use net/http\nRATIONALE: stdlib is enough\n", encoding="utf-8"
+    )
+    (vdir / "qa.verdict").write_text(
+        "CHOICE: Use resty\nRATIONALE: retries matter\n", encoding="utf-8"
+    )
+    out = json.loads(aggregate(str(cfg_path), str(vdir), "Use net/http (Recommended)"))
+    rows = {p["id"]: p for p in out["panelists"]}
+    assert rows["da"]["verdict"] == "OVERTURN"
+    assert rows["da"]["alternative"] == "Use resty"
+    assert rows["pe"]["verdict"] == "HOLD"
+    assert rows["pe"]["alternative"] == "n/a"
+    assert rows["qa"]["verdict"] == "OVERTURN"
+    assert rows["qa"]["alternative"] == "Use resty"
+
+
+def test_blinded_choice_matching_no_option_becomes_a_free_text_overturn(tmp_path):
+    """Pins TODAY'S behaviour: an off-list CHOICE is an OVERTURN, verbatim.
+
+    aggregate() never receives the option list - only the recommended label -
+    so it cannot tell an invented option from a real one. Exact matching makes
+    any non-matching CHOICE an OVERTURN carrying that raw text as the
+    alternative, with no validation or sanitization applied. This is a
+    deliberate consequence of exact matching, not an oversight; a future
+    change here should be a conscious decision, so it is pinned rather than
+    left implicit.
+    """
+    cfg_path = _write_blind_config(tmp_path)
+    vdir = tmp_path / "v"
+    vdir.mkdir()
+    (vdir / "pe.verdict").write_text(
+        "CHOICE: Use grpc-gateway\nRATIONALE: transcoding is free\n",
+        encoding="utf-8",
+    )
+    out = json.loads(aggregate(str(cfg_path), str(vdir), "Use net/http (Recommended)"))
+    row = [p for p in out["panelists"] if p["id"] == "pe"][0]
+    assert row["verdict"] == "OVERTURN"
+    assert row["alternative"] == "Use grpc-gateway"

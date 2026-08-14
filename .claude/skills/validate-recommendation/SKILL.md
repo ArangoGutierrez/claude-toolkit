@@ -11,11 +11,11 @@ Your job: dispatch an N-panelist review (where N comes from
 `~/.claude/panel/config.yml`), aggregate the verdicts into a JSON
 directive, and act on it.
 
-The panel composition is **configurable** — defaults to one Devil's
-Advocate via Nemotron (`nat-nim` backend), and any number of additional
-panelists (PE, QA, etc.) can be opted in by setting `enabled: true` in
-`config.yml`. This skill is config-driven; it does NOT assume two
-fixed panelists.
+The panel composition is **configurable** and ships as three panelists:
+an adversarial DA, which is told which option was recommended, plus a
+blinded PE and QA, which are not. Any of them can be turned off, and new
+ones added, in `config.yml`. This skill is config-driven; it does NOT
+assume a fixed panel — always enumerate the enabled set from the config.
 
 ## Inputs
 
@@ -90,29 +90,25 @@ equivalent: `python3.12 -m panel lint-config --config "$CONFIG"` prints
 the same data in human-readable form; you can grep its output for the
 `- <id>` lines and extract role/backend from them.)
 
-### 2a. Resolve the panel profile (team auto-detect)
+### 2a. Resolve the panel profile
 
-PE and QA are `enabled: false` in `config.yml` (the solo default). Enable them
-for THIS dispatch only when a team context is detected, in priority order:
+The default panel is all three panelists: an adversarial DA plus a blinded
+PE and QA. There is no team auto-detect — the ensemble is the standard
+operating mode, because at N=1 the hard threshold is ceil(1/2) = 1, which
+makes SOFT-DISSENT unreachable and turns every single OVERTURN into a hard
+interrupt.
 
-1. **Override:** if `CLAUDE_PANEL_PROFILE` is set — `team` forces PE+QA on,
-   `solo` forces config defaults (skip steps 2–3). Read it via Bash:
-   `echo "${CLAUDE_PANEL_PROFILE:-}"`.
-2. **Live team:** else, call the `TeamList` tool. If it returns ≥1 active agent,
-   the profile is `team`.
-3. **Filesystem signal:** else, run the helper:
-   ```bash
-   bash "${HOME}/.claude/skills/validate-recommendation/detect-team-context.sh"
-   ```
-   If it prints `team`, the profile is `team`.
-4. Otherwise the profile is `solo`.
+One override, for cost control:
 
-If the resolved profile is `team`, enable PE+QA for this dispatch. The stock
-`config.yml` keeps them `enabled: false`, and **`panel aggregate` re-derives its
-panelist set from its `--config`** — so dispatching PE+QA is not enough on its own;
-the aggregator would silently drop their verdicts. Write a profile-resolved config
-and use it as the effective config for the REST of this run (the section-2
-enumeration AND the §5 aggregator):
+- `CLAUDE_PANEL_PROFILE=solo` disables PE and QA for this dispatch, leaving
+  DA only. Read it via Bash: `echo "${CLAUDE_PANEL_PROFILE:-}"`. Use it when
+  the extra two Claude subagent spawns are not worth it.
+
+If solo is requested, write a resolved config with `pe` and `qa` set to
+`enabled: false` and use it as `$CONFIG_RESOLVED` for the REST of this run
+(both the section-2 enumeration AND the §4 aggregator — `panel aggregate`
+re-derives its panelist set from its `--config`, so it would otherwise
+silently disagree with what was dispatched).
 
 ```bash
 CONFIG_RESOLVED="${TMPDIR:-/tmp}/panel-config-resolved-${CLAUDE_SESSION_ID:-$PPID}.yml"
@@ -121,19 +117,15 @@ import sys, yaml
 cfg = yaml.safe_load(open(sys.argv[1]))
 for p in cfg.get("panelists", []):
     if p.get("id") in ("pe", "qa"):
-        p["enabled"] = True
+        p["enabled"] = False
 yaml.safe_dump(cfg, open(sys.argv[2], "w"))
 PY
 ```
 
-Re-run the section-2 enumeration against `$CONFIG_RESOLVED` (it now lists three
-panelists — the two added rows are `pe|PE|claude-subagent|principal-engineer` and
-`qa|QA|claude-subagent|qa-engineer`) and pass `$CONFIG_RESOLVED` to the §5
-aggregator. Solo profile: skip this; keep the stock `$CONFIG` (DA-only).
+Then re-run the section-2 enumeration against `$CONFIG_RESOLVED` (it now
+lists `da` only) and pass `$CONFIG_RESOLVED` to the §4 aggregator.
 
-Cost note: PE+QA each spawn a Claude subagent — only enable in team context, and
-only for genuine scope-guard forks (architecture / security / API / irreversible;
-see `rules/panel.md`). Solo sessions stay DA-only.
+Otherwise use the stock `$CONFIG` unchanged and skip to step 3.
 
 ### 3. Create the per-session workdir
 
@@ -151,40 +143,44 @@ panelist after fan-out completes.
 For EACH question in `tool_input.questions` that has an option labeled
 with `(Recommended)` AND NOT `(Recommended; Panel-flagged)`:
 
-### 1. Build the user prompt body
+### 1. Build the per-panelist prompt files
 
-Construct from state file data:
+Write the question payload to a JSON file, then let the CLI build each
+panelist's prompt. Blinding is applied automatically from each panelist's
+`blind` flag — do NOT hand-write prompt bodies, and do NOT mention the
+recommended option to a blinded panelist.
 
-```
-Question: <question text>
-Options (verbatim labels and descriptions):
-  <option 1 label> — <option 1 description>
-  <option 2 label> — <option 2 description>
-  ...
-Assistant's recommended option: <recommended label>
-Assistant's stated reasoning: <see "Reasoning extraction" below>
-```
+```bash
+QPAYLOAD="${TMPDIR:-/tmp}/panel-question-${CLAUDE_SESSION_ID:-$PPID}-q<N>.json"
+# Write JSON: {"question": ..., "options": [{"label":..., "description":...}],
+#              "recommended_label": ..., "reasoning": ...}
+# reasoning comes from the recommended option's description; if there is
+# none, use "(no reasoning supplied)". NEVER invent hidden reasoning.
 
-Write to a per-question prompt file:
-
-```
-PROMPT_FILE="${TMPDIR:-/tmp}/panel-prompt-${CLAUDE_SESSION_ID}-q<N>.txt"
+for PID in <each enabled panelist id>; do
+  "${CLAUDE_PANEL_PYTHON:-python3.12}" -m panel build-prompt \
+    --panelist "$PID" \
+    --config "${CONFIG_RESOLVED:-$CONFIG}" \
+    --question-file "$QPAYLOAD" \
+    --output "${TMPDIR:-/tmp}/panel-prompt-${CLAUDE_SESSION_ID:-$PPID}-q<N>-${PID}.txt"
+done
 ```
 
 Where `<N>` is the question index (0-based).
 
-### 2. Reasoning extraction
+Each panelist is then dispatched with ITS OWN prompt file. A blinded
+panelist's file has the recommendation removed, the `(Recommended)` marker
+stripped, and the options deterministically reordered.
 
-The "stated reasoning" passed to panelists comes from:
+The payload's `reasoning` field is read only for UNBLINDED panelists;
+`build-prompt` substitutes an empty string for a blinded one. That is why
+the payload may carry the literal `(no reasoning supplied)` safely. Never
+call the underlying `build_prompt_body` yourself with a blinded panelist and
+a non-empty reasoning — including that literal, which is a non-empty string:
+it raises `ValueError` by design. Go through the CLI and the question is
+moot.
 
-1. The recommended option's `description` field (primary source).
-2. The question's lead text, if it contains rationale phrases.
-
-If neither is informative, pass `(no reasoning supplied)`. Panelists
-are told this is acceptable input. NEVER attempt to read or fabricate
-hidden chain-of-thought.
-
-### 3. Fan out N panelists in ONE message
+### 2. Fan out N panelists in ONE message
 
 **This is the parallelism point. All panelist dispatches MUST be in a
 single message so they run concurrently.**
@@ -204,11 +200,15 @@ For EACH enabled panelist from the config enumeration above:
   cd "${HOME}/.claude/skills/validate-recommendation" && \
       "${CLAUDE_PANEL_PYTHON:-python3.12}" -m panel dispatch \
       --panelist "<id>" \
-      --config "$CONFIG" \
+      --config "${CONFIG_RESOLVED:-$CONFIG}" \
       --persona "${HOME}/.claude/skills/validate-recommendation/personas/<role-lowercase>.md" \
-      --prompt-file "$PROMPT_FILE" \
+      --prompt-file "${TMPDIR:-/tmp}/panel-prompt-${CLAUDE_SESSION_ID:-$PPID}-q<N>-<id>.txt" \
       --output "${WORKDIR}/<id>.verdict"
   ```
+
+  The `--prompt-file` is THIS panelist's file from step 1, not a shared
+  one. Passing another panelist's file hands a blinded seat the
+  recommendation.
 
   `dispatch.py` writes the verdict file directly (mode 0600). Auth
   comes from per-backend env vars (`nat-nim`: `$PANEL_DA_API_KEY`,
@@ -222,16 +222,19 @@ For EACH enabled panelist from the config enumeration above:
   - `description`: short, e.g., `"Panel <role> review"`
   - `prompt`: the concatenation of the persona file's `# System prompt`
     section, the `# One-shot example` section (if present), and the
-    user prompt body from step 1.
+    contents of THIS panelist's prompt file from step 1
+    (`…-q<N>-<id>.txt`), copied verbatim.
 
-  Read the persona file via the `Read` tool BEFORE composing the
-  fan-out message:
-  `${HOME}/.claude/skills/validate-recommendation/personas/<role-lowercase>.md`.
+  Read both files via the `Read` tool BEFORE composing the fan-out
+  message: the persona at
+  `${HOME}/.claude/skills/validate-recommendation/personas/<role-lowercase>.md`,
+  and the panelist's own prompt file. Never re-compose the prompt body by
+  hand — for a blinded panelist that is the leak.
 
 All `Bash` + `Agent` calls go in ONE message. The framework executes
 them concurrently.
 
-### 4. Collect verdict files after fan-out returns
+### 3. Collect verdict files after fan-out returns
 
 When the fan-out message's tool results come back:
 
@@ -246,10 +249,15 @@ When the fan-out message's tool results come back:
   ```
 
   Do NOT alter, summarize, or extract from the Agent response. The
-  aggregator parses `VERDICT:`/`RATIONALE:`/`ALTERNATIVE:` lines from
-  the verbatim text; surrounding prose is ignored.
+  aggregator does the parsing, and which lines it wants depends on the
+  panelist: an UNBLINDED one emits `VERDICT:`/`RATIONALE:`/`ALTERNATIVE:`,
+  a BLINDED one emits `CHOICE:`/`RATIONALE:`. `aggregate()` maps a blinded
+  `CHOICE:` onto the same contract — agreement with the recommended label
+  is HOLD, disagreement is OVERTURN naming that option — comparing
+  marker- and case-insensitively. Surrounding prose is ignored, and a
+  blinded reply with no `CHOICE:` line becomes ERROR for that panelist.
 
-### 5. Run the aggregator
+### 4. Run the aggregator
 
 Same rule as dispatch: export `CLAUDE_SESSION_ID` from the state file's
 `session_id` inside this SAME command, so the aggregator's trace lines
@@ -266,7 +274,7 @@ DIRECTIVE_JSON=$(export CLAUDE_SESSION_ID="$(jq -r '.session_id' "${TMPDIR:-/tmp
 
 Capture stdout into `$DIRECTIVE_JSON`. It's a single-line JSON object.
 
-### 6. Parse the directive
+### 5. Parse the directive
 
 Extract fields via `jq`:
 
@@ -369,20 +377,30 @@ rm -rf "$WORKDIR"
 rm -f "$STATE_FILE"
 ```
 
-Then remove each per-question prompt file you actually wrote, one
-`rm -f` per exact path — using the same 0-based indices you dispatched
-in the per-question loop above (you know how many questions you
-processed; do not glob `-q*.txt`):
+Then remove each question payload and each per-panelist prompt file you
+actually wrote, one `rm -f` per exact path — using the same 0-based
+question indices you dispatched in the per-question loop above, crossed
+with the panelist ids you enumerated (you know both sets; do not glob
+`-q*.json` or `-q*-*.txt`):
 
 ```bash
-rm -f "${TMPDIR:-/tmp}/panel-prompt-${CLAUDE_SESSION_ID}-q0.txt"
-rm -f "${TMPDIR:-/tmp}/panel-prompt-${CLAUDE_SESSION_ID}-q1.txt"
-# ... one rm -f per question index you actually dispatched a prompt file
-# for. Skip indices that were never a (Recommended) question — there is
-# no file for them, and rm -f on a path that doesn't exist is a no-op.
+rm -f "${TMPDIR:-/tmp}/panel-question-${CLAUDE_SESSION_ID:-$PPID}-q0.json"
+rm -f "${TMPDIR:-/tmp}/panel-prompt-${CLAUDE_SESSION_ID:-$PPID}-q0-da.txt"
+rm -f "${TMPDIR:-/tmp}/panel-prompt-${CLAUDE_SESSION_ID:-$PPID}-q0-pe.txt"
+rm -f "${TMPDIR:-/tmp}/panel-prompt-${CLAUDE_SESSION_ID:-$PPID}-q0-qa.txt"
+# ... then the same four lines for q1, q2, ... — one payload plus one
+# prompt file per enabled panelist, for every question index you actually
+# dispatched. Use the ids from YOUR enumeration, not this example's:
+# solo profile writes only the da file, and a config with other panelists
+# writes theirs. Skip indices that were never a (Recommended) question —
+# there is no file for them, and rm -f on a missing path is a no-op.
+#
+# ${CLAUDE_SESSION_ID:-$PPID} must match the fallback used when the files
+# were built. A bare ${CLAUDE_SESSION_ID} resolves to an empty string in a
+# session where it is unset, and removes a path nothing ever wrote.
 ```
 
-If step 2a resolved a team profile, `$CONFIG_RESOLVED` holds the exact
+If step 2a resolved a solo profile, `$CONFIG_RESOLVED` holds the exact
 resolved-config path already — remove that path directly (it is a
 single concrete path, not a glob):
 
@@ -407,10 +425,10 @@ runs. `panel gc` will eventually reap stale workdirs (Phase 6).
 | State file missing | Print fallback message; re-issue original `AskUserQuestion`. |
 | `panel lint-config` fails | Print "Panel disabled: config invalid"; re-issue original. |
 | `~/.claude/panel/config.yml` missing | Caught by `lint-config`; same fallback. |
-| Persona file missing for a configured role | Fall back. Print "Panel personas unavailable for <role>"; re-issue original. |
+| Persona file missing for an ENABLED panelist | Caught up front by `lint-config`'s persona/blind cross-check; same fallback as an invalid config. A disabled panelist's persona is never loaded. |
 | `panel dispatch` crashes (caller-bug exit 1) | Verdict file not written. Aggregator coerces to ERROR for that panelist. Severity decides per failure_mode. |
 | `panel dispatch` exits 0 but writes ERROR verdict | Normal path. Severity decides per failure_mode. |
-| `Agent` tool call errors / returns garbled output | Write verbatim to verdict file; aggregator coerces to ERROR for that panelist if `VERDICT:` line is missing. |
+| `Agent` tool call errors / returns garbled output | Write verbatim to verdict file; aggregator coerces to ERROR for that panelist when its expected line is missing — `VERDICT:` unblinded, `CHOICE:` blinded. |
 | `panel aggregate` crashes (non-zero exit) | Fall back. Re-issue original with marker swap. |
 | `$WORKDIR` unwritable | Fall back. Print "Panel infrastructure unavailable". |
 | Missing API keys (e.g., `$PANEL_DA_API_KEY`) | `dispatch.py` writes ERROR verdict; aggregator emits ERROR directive (at N=1) or degrades (at N>=3 with graceful failure_mode). User-facing message ends up as re-ask original. |

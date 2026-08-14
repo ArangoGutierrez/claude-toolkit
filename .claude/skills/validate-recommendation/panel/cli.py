@@ -92,7 +92,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         for p in enabled:
             extra = f"model={p.model}" if p.model else f"subagent={p.subagent_type}"
-            print(f"  - {p.id} (role={p.role}, backend={p.backend}, {extra})")
+            blind = ", blind" if p.blind else ""
+            print(f"  - {p.id} (role={p.role}, backend={p.backend}, {extra}{blind})")
         return 0
 
     if args.cmd == "dispatch":

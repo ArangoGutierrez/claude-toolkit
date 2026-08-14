@@ -14,6 +14,8 @@ import textwrap
 
 import pytest
 
+from panel.config import load_config
+
 
 def _write_yaml(tmp_path, content):
     p = tmp_path / "config.yml"
@@ -282,3 +284,34 @@ def test_panelist_id_required(tmp_path):
     """)
     with pytest.raises(ConfigError, match=r"id"):
         load_config(cfg)
+
+
+def test_panelist_blind_defaults_false_and_parses_true(tmp_path):
+    cfg_file = tmp_path / "config.yml"
+    cfg_file.write_text(
+        "version: 1\n"
+        "panelists:\n"
+        "  - id: da\n"
+        "    role: DA\n"
+        "    enabled: true\n"
+        "    backend: nat-nim\n"
+        "    model: m\n"
+        "  - id: pe\n"
+        "    role: PE\n"
+        "    enabled: true\n"
+        "    backend: claude-subagent\n"
+        "    subagent_type: principal-engineer\n"
+        "    blind: true\n"
+        "  - id: qa\n"
+        "    role: QA\n"
+        "    enabled: true\n"
+        "    backend: claude-subagent\n"
+        "    subagent_type: qa-engineer\n"
+        "    blind: true\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_file)
+    by_id = {p.id: p for p in cfg.panelists}
+    assert by_id["da"].blind is False, "omitted blind must default to False"
+    assert by_id["pe"].blind is True
+    assert by_id["qa"].blind is True

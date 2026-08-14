@@ -32,6 +32,7 @@ class Panelist:
     max_tokens: int = 32768
     temperature: float = 0.3
     timeout_seconds: int = 60
+    blind: bool = False       # hide the recommendation from this panelist
 
 
 @dataclass
@@ -122,6 +123,7 @@ def load_config(path: str | Path) -> Config:
             max_tokens=int(p.get("max_tokens", 32768)),
             temperature=float(p.get("temperature", 0.3)),
             timeout_seconds=int(p.get("timeout_seconds", 60)),
+            blind=bool(p.get("blind", False)),
         ))
 
     enabled_count = sum(1 for p in panelists if p.enabled)

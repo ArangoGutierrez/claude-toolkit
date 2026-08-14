@@ -146,7 +146,16 @@ def _resolve_failure_mode(config: Config, n_total: int) -> str:
 
 
 def _degrade_keeping_odd(panelists: list[ParsedVerdict]) -> list[ParsedVerdict]:
-    """Drop ERROR panelists; if surviving count is even, drop one more."""
+    """Drop ERROR panelists; if the surviving count is even, drop one more.
+
+    The second drop is deliberately the LAST surviving panelist in config
+    order, so degradation is deterministic and reproducible rather than
+    incidental. Config order is the operator's declared priority order, so
+    the lowest-priority seat is the one that goes.
+
+    This path is reachable under the shipped `auto` mode: _resolve_failure_mode
+    returns strict only at N=1 and N=3, and graceful at N>=5.
+    """
     surviving = [p for p in panelists if p.verdict != "ERROR"]
     if surviving and (len(surviving) % 2 == 0):
         surviving = surviving[:-1]

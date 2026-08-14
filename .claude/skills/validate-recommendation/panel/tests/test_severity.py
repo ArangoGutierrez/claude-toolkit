@@ -220,7 +220,12 @@ def test_n3_auto_one_error_resolves_to_strict_emits_error():
 
 
 def test_n5_graceful_one_error_degrades_to_three():
-    """graceful drops the ERROR panelist; surviving N=4 is even, drop 1 more to 3."""
+    """graceful drops the ERROR panelist; surviving N=4 is even, drop 1 more to 3.
+
+    Asserts WHICH panelists survive, not merely how many. A count-only
+    assertion is satisfied by any trim rule and would not catch a
+    positional drop of a panelist that actually voted.
+    """
     cfg = _config(5, on_panelist_error="graceful")
     d = decide(cfg, [
         _v("ERROR", id="p0"),
@@ -231,6 +236,27 @@ def test_n5_graceful_one_error_degrades_to_three():
     ])
     assert d.verdict == "HOLD"
     assert len(d.panelists) == 3
+    surviving = [p.id for p in d.panelists]
+    assert surviving == ["p1", "p2", "p3"], (
+        f"degradation must drop the LAST surviving panelist deterministically, "
+        f"got {surviving}"
+    )
+
+
+def test_degrade_never_drops_a_panelist_that_voted_when_an_error_seat_remains():
+    """The dropped seat must be chosen by rule, not by list position."""
+    cfg = _config(5, on_panelist_error="graceful")
+    d = decide(cfg, [
+        _v("HOLD", id="p0", role="DA"),
+        _v("HOLD", id="p1", role="PE"),
+        _v("ERROR", id="p2"),
+        _v("HOLD", id="p3", role="R3"),
+        _v("OVERTURN", id="p4", role="R4", alt="Option B"),
+    ])
+    surviving = [p.id for p in d.panelists]
+    assert "p2" not in surviving, "the ERROR seat must be dropped first"
+    assert len(surviving) == 3
+    assert len(set(surviving)) == 3
 
 
 def test_n5_auto_one_error_resolves_to_graceful_degrades_to_three():

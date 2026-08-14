@@ -4,10 +4,12 @@ Subcommands shipped so far:
 - aggregate         (Phase 3c — N-panelist JSON directive)
 - lint-config       (Phase 3a — config validation)
 - dispatch          (Phase 3b — langchain-provider-backed panelist dispatch)
+- build-prompt      (blinded panelist prompt body)
+- stats             (per-panelist dissent-rate health metric)
 
 Subcommands planned for later phases:
 - record-userpick   (Phase 6)
-- ls, show, label, stats, replay, gc   (Phase 6)
+- ls, show, label, replay, gc   (Phase 6)
 - tune              (Phase 7 — NAT Eval-backed)
 """
 import argparse
@@ -80,6 +82,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     bp.add_argument("--output", required=True, help="Prompt body output path")
 
+    st = sub.add_parser("stats", help="Per-panelist dissent-rate health metric")
+    st.add_argument(
+        "--jsonl", default=None,
+        help="Path to decisions.jsonl (default: ~/.claude/panel/decisions.jsonl)",
+    )
+    st.add_argument("--min-n", type=int, default=20, help="Minimum votes before flagging")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "aggregate":
@@ -141,6 +150,22 @@ def main(argv: list[str] | None = None) -> int:
             blind=blinded,
         )
         Path(args.output).write_text(body, encoding="utf-8")
+        return 0
+
+    if args.cmd == "stats":
+        from panel.stats import load_rows, panelist_dissent_rates, health_flags
+        jsonl = args.jsonl or (Path.home() / ".claude" / "panel" / "decisions.jsonl")
+        rates = panelist_dissent_rates(load_rows(jsonl))
+        flags = health_flags(rates, min_n=args.min_n)
+        if not rates:
+            print("no decisions recorded yet")
+            return 0
+        for pid in sorted(rates):
+            s = rates[pid]
+            print(
+                f"  {pid:<14} n={s['n']:<5} overturns={s['overturns']:<5} "
+                f"dissent-rate={s['dissent_rate'] * 100:5.1f}%  {flags[pid]}"
+            )
         return 0
 
     parser.error(f"unknown command: {args.cmd}")

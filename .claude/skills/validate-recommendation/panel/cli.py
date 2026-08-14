@@ -28,8 +28,10 @@ def _persona_blind_problems(panelists) -> list[str]:
     which option was recommended — so its seat must set `blind: true`. A
     persona that asks for `VERDICT:` judges a named recommendation, so its
     seat must not be blinded. A mismatch fails silently and totally at
-    runtime: dispatch.py rewrites any reply lacking a VERDICT line to
-    `VERDICT: ERROR`, so the seat dies on every question.
+    runtime: a claude-subagent reply is written to its verdict file verbatim,
+    and `aggregate()` scores a file carrying no `VERDICT:` line as ERROR for
+    that panelist, so the seat dies on every question. (On a nat-* backend
+    `dispatch.py` performs the equivalent rewrite before the file is written.)
 
     This lives here rather than in `load_config` because it is a property of
     the persona files, not of the config document: `load_config` stays a pure

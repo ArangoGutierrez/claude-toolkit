@@ -44,8 +44,9 @@ def test_template_passes_lint_config(capsys):
     """The shipped template must satisfy the persona/blind cross-check.
 
     Enabling a claude-subagent seat without `blind: true` gives it the
-    unblinded prompt body while its persona demands `CHOICE:`; dispatch.py
-    then rewrites every reply to `VERDICT: ERROR`.
+    unblinded prompt body while its persona demands `CHOICE:`. Its reply
+    carries no `VERDICT:` line, and `aggregate()` scores that as ERROR for
+    the panelist on every question.
     """
     from panel.cli import main
     rc = main(["lint-config", "--config", str(TEMPLATE)])

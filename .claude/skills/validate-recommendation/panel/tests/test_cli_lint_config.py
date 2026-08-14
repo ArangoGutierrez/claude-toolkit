@@ -70,10 +70,11 @@ def test_lint_config_reports_error_on_missing_file(tmp_path, capsys):
 #
 # A seat's `blind` flag and its persona's output contract are two halves of
 # one decision, written in two files. When they disagree the failure is
-# silent and total: dispatch.py rewrites any reply lacking a VERDICT line to
-# `VERDICT: ERROR`, so an unblinded seat whose persona demands CHOICE dies on
-# every question while the config still lints clean. lint-config is the only
-# place both halves are visible at once.
+# silent and total: a claude-subagent reply lands in its verdict file
+# verbatim, and `aggregate()` scores a file with no `VERDICT:` line as ERROR,
+# so an unblinded seat whose persona demands CHOICE dies on every question
+# while the config still lints clean. lint-config is the only place both
+# halves are visible at once.
 #
 # The check reads the REAL personas/ directory shipped next to panel/, so
 # these configs use the real roles: DA's persona demands `VERDICT:`, PE's and

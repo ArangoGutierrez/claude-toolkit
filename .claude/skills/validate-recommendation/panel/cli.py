@@ -21,6 +21,55 @@ def _default_config_path() -> Path:
     return Path.home() / ".claude" / "panel" / "config.yml"
 
 
+def _persona_blind_problems(panelists) -> list[str]:
+    """Report enabled seats whose `blind` flag contradicts their persona.
+
+    A persona that asks for `CHOICE:` is a blinded persona — it is never told
+    which option was recommended — so its seat must set `blind: true`. A
+    persona that asks for `VERDICT:` judges a named recommendation, so its
+    seat must not be blinded. A mismatch fails silently and totally at
+    runtime: dispatch.py rewrites any reply lacking a VERDICT line to
+    `VERDICT: ERROR`, so the seat dies on every question.
+
+    This lives here rather than in `load_config` because it is a property of
+    the persona files, not of the config document: `load_config` stays a pure
+    parser, and an unblinded claude-subagent seat remains legal on its own.
+    """
+    from panel.personas import PersonaError, load_persona_by_role
+
+    problems: list[str] = []
+    for p in panelists:
+        if not p.enabled:
+            continue
+        who = f"panelist '{p.id}' (role {p.role})"
+        try:
+            persona = load_persona_by_role(p.role)
+        except PersonaError as e:
+            problems.append(f"PERSONA/BLIND ERROR: {who} has no usable persona: {e}")
+            continue
+        wants_choice = "CHOICE:" in persona.system_prompt
+        wants_verdict = "VERDICT:" in persona.system_prompt
+        if wants_choice and not wants_verdict:
+            if not p.blind:
+                problems.append(
+                    f"PERSONA/BLIND ERROR: {who} has a persona that demands a "
+                    f"CHOICE: reply, so it must set blind: true"
+                )
+        elif wants_verdict and not wants_choice:
+            if p.blind:
+                problems.append(
+                    f"PERSONA/BLIND ERROR: {who} has a persona that demands a "
+                    f"VERDICT: reply, so it must not set blind: true"
+                )
+        else:
+            problems.append(
+                f"PERSONA/BLIND ERROR: {who} has a persona with no single output "
+                f"contract: its system prompt must ask for exactly one of "
+                f"CHOICE: or VERDICT:"
+            )
+    return problems
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="panel", description="validate-recommendation panel CLI"
@@ -107,6 +156,11 @@ def main(argv: list[str] | None = None) -> int:
             cfg = load_config(cfg_path)
         except ConfigError as e:
             print(f"CONFIG ERROR: {e}", file=sys.stderr)
+            return 1
+        problems = _persona_blind_problems(cfg.panelists)
+        if problems:
+            for line in problems:
+                print(line, file=sys.stderr)
             return 1
         enabled = [p for p in cfg.panelists if p.enabled]
         print(

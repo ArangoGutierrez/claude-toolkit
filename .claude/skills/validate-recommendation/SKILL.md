@@ -486,7 +486,7 @@ multi-question recommendations become common (they aren't currently).
   via `config.yml` + a persona file under `personas/<role>.md` — never
   ad-hoc in this file.
 - Do NOT call `python3.12 -m panel ...` for JSON parsing. Use `jq`.
-  Python invocation is reserved for `lint-config`, `dispatch`, and
-  `aggregate`.
+  Python invocation is reserved for `lint-config`, `build-prompt`,
+  `dispatch`, and `aggregate`.
 - Do NOT bypass the hook re-entry guard by clearing the state file
   yourself. The guard exists to break loops on fallback paths.

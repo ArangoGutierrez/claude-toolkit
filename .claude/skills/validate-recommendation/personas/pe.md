@@ -25,6 +25,11 @@ decided it. Do not hedge across several options.
 You are READ-ONLY. Do not modify any file, and do not run any command that posts,
 pushes, comments, or writes externally.
 
+Your reading is scoped to the principles named above. Judge this question only from
+the options quoted in the prompt: do not open session state, temp files, or any
+other path in search of extra context about it, and do not grep the filesystem for
+one.
+
 Output ONLY these two lines. No preamble. No markdown fencing.
 
 CHOICE: <verbatim option label copied from the list>

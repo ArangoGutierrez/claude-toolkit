@@ -164,23 +164,73 @@ run_case "log with no panelist votes -> SKIP" 2 \
 
 # ------------------------------- cases 7-8: the fake tree and a gutted reader ---
 # The eval derives SUBJECT, and from it PKG_ROOT, from its own directory, so a
-# copy of the skill under $TMP/tree is what a copy of the eval grades. Both
-# cases run with EVAL_SUBJECT unset, which is what pins that resolution.
-TREE="$TMP/tree"
-mkdir -p "$TREE/.claude/evals" "$TREE/.claude/skills/validate-recommendation"
-command cp "$EVAL_SRC" "$TREE/.claude/evals/panel-dissent-health.sh"
-cmp -s "$EVAL_SRC" "$TREE/.claude/evals/panel-dissent-health.sh" || {
-  echo "$NAME: FAIL — the eval copy in the fake tree differs from the source"; exit 1; }
-TREE_EVAL="$TREE/.claude/evals/panel-dissent-health.sh"
+# copy of the skill under $TMP/<tree> is what a copy of the eval grades. Every
+# fake-tree case runs with EVAL_SUBJECT unset, which is what pins that
+# resolution. Echoes the eval path into $2 and the stats.py path into $3.
+make_tree() {
+  local tree="$1"
+  mkdir -p "$tree/.claude/evals" "$tree/.claude/skills/validate-recommendation"
+  command cp "$EVAL_SRC" "$tree/.claude/evals/panel-dissent-health.sh"
+  cmp -s "$EVAL_SRC" "$tree/.claude/evals/panel-dissent-health.sh" || {
+    echo "$NAME: FAIL — the eval copy in $tree differs from the source"; exit 1; }
+  command cp -R "$SUBJECT/panel" "$tree/.claude/skills/validate-recommendation/panel" || {
+    echo "$NAME: FAIL — could not copy the panel package into $tree"; exit 1; }
+  [ -f "$tree/.claude/skills/validate-recommendation/panel/stats.py" ] || {
+    echo "$NAME: FAIL — the panel copy in $tree has no stats.py"; exit 1; }
+  # Explicit paths, never a glob: a stale __pycache__ would let the ORIGINAL
+  # load_rows answer for the mutated source and turn the case vacuously green.
+  rm -rf "$tree/.claude/skills/validate-recommendation/panel/__pycache__" \
+         "$tree/.claude/skills/validate-recommendation/panel/tests/__pycache__"
+}
 
-command cp -R "$SUBJECT/panel" "$TREE/.claude/skills/validate-recommendation/panel" || {
-  echo "$NAME: FAIL — could not copy the panel package into the fake tree"; exit 1; }
+# Rewrites the first line of load_rows' body. $1 stats.py, $2 the replacement.
+# awk index()/substr(), not sed — the literal holds regex metacharacters. The
+# substitution proves it applied before the case is trusted; a silent no-op
+# would leave the reader working and the case vacuously green.
+gut_load_rows() {
+  local stats="$1" rep="$2" lit='    p = Path(path).expanduser()' before after
+  before="$(grep -cF -- "$lit" "$stats")"
+  awk -v lit="$lit" -v rep="$rep" '
+    { i = index($0, lit)
+      if (i > 0) $0 = substr($0, 1, i-1) rep substr($0, i + length(lit))
+      print }
+  ' "$stats" > "$stats.mut" && command mv -f "$stats.mut" "$stats"
+  after="$(grep -cF -- "$lit" "$stats")"
+  if [ "${before:-0}" -ne 1 ] || [ "${after:-1}" -ne 0 ]; then
+    echo "$NAME: FAIL — mutating load_rows did not apply (before=$before, after=$after); stats.py changed shape"
+    exit 1
+  fi
+  grep -qF -- "$rep" "$stats" || {
+    echo "$NAME: FAIL — the replacement '$rep' is absent from $stats after the rewrite"; exit 1; }
+}
+
+# Wraps load_rows so it keeps only the first $2 rows of whatever it read. An
+# append, not a rewrite: the module-level rebinding is unambiguous, where a
+# substitution on `    return rows` would match two lines at two indents.
+truncate_reader() {
+  local stats="$1" keep="$2" before after
+  before="$(wc -l < "$stats")"
+  cat >> "$stats" <<PY
+
+_orig_load_rows = load_rows  # MUTANT
+
+
+def load_rows(path):  # MUTANT: keeps only the first $keep rows
+    return _orig_load_rows(path)[:$keep]
+PY
+  after="$(wc -l < "$stats")"
+  [ "$((after - before))" -eq 6 ] || {
+    echo "$NAME: FAIL — the truncating wrapper did not append (before=$before, after=$after)"; exit 1; }
+  [ "$(grep -cF 'MUTANT' "$stats")" -eq 2 ] || {
+    echo "$NAME: FAIL — expected 2 MUTANT markers in $stats"; exit 1; }
+  "$PYBIN" -c "import ast,sys; ast.parse(open(sys.argv[1]).read())" "$stats" || {
+    echo "$NAME: FAIL — the truncating wrapper left $stats unparsable"; exit 1; }
+}
+
+TREE="$TMP/tree"
+make_tree "$TREE"
+TREE_EVAL="$TREE/.claude/evals/panel-dissent-health.sh"
 TREE_STATS="$TREE/.claude/skills/validate-recommendation/panel/stats.py"
-[ -f "$TREE_STATS" ] || { echo "$NAME: FAIL — the panel copy has no stats.py"; exit 1; }
-# Explicit paths, never a glob: a stale __pycache__ would let the ORIGINAL
-# load_rows answer for the mutated source and turn case 8 vacuously green.
-rm -rf "$TREE/.claude/skills/validate-recommendation/panel/__pycache__" \
-       "$TREE/.claude/skills/validate-recommendation/panel/tests/__pycache__"
 
 # Control: the untouched copy must reach the same PASS as case 3. Without it a
 # FAIL in case 8 could come from the copy rather than from the mutation.
@@ -189,22 +239,7 @@ run_case "fake tree, reader intact, EVAL_SUBJECT unset -> PASS" 0 \
   "$MIXED" 6 "" "$TREE_EVAL"
 
 # Gut load_rows: return the empty accumulator before the file is ever opened.
-# awk index()/substr(), not sed — the literal holds regex metacharacters. The
-# substitution proves it applied before the case is trusted; a silent no-op
-# would leave the reader working and the case vacuously green.
-LIT='    p = Path(path).expanduser()'
-REP='    return rows'
-before="$(grep -cF -- "$LIT" "$TREE_STATS")"
-awk -v lit="$LIT" -v rep="$REP" '
-  { i = index($0, lit)
-    if (i > 0) $0 = substr($0, 1, i-1) rep substr($0, i + length(lit))
-    print }
-' "$TREE_STATS" > "$TREE_STATS.mut" && command mv -f "$TREE_STATS.mut" "$TREE_STATS"
-after="$(grep -cF -- "$LIT" "$TREE_STATS")"
-if [ "${before:-0}" -ne 1 ] || [ "${after:-1}" -ne 0 ]; then
-  echo "$NAME: FAIL — gutting load_rows did not apply (before=$before, after=$after); stats.py changed shape"
-  exit 1
-fi
+gut_load_rows "$TREE_STATS" '    return rows'
 
 # The gutted reader sees the same 6-vote log as the control case above.
 voters="$(grep -cE '"panelists"[[:space:]]*:[[:space:]]*\[[[:space:]]*\{' "$MIXED")"
@@ -227,9 +262,48 @@ run_case "every vote line truncated -> FAIL" 1 \
   "EVAL panel-dissent-health: FAIL — the reader returned no panelist rows, but $TRUNCATED carries $bad line(s) of panelist votes; load_rows is broken (or every such line is malformed) and the metric is measuring nothing" \
   "$TRUNCATED" 6 "$SUBJECT"
 
+# --------------------------- cases 10-11: a reader that truncates, not one ---
+# --------------------------- that returns nothing.
+#
+# The nastier half of the same failure. A reader returning SOME of the log
+# leaves a non-zero row count, so the empty-read guard never fires, and the
+# eval reports an affirmative PASS while a rubber stamp sits in the data it
+# dropped. Green on the exact condition the metric exists to catch.
+#
+# The fixture is ordered: 25 healthy qa votes first, then 25 rubber-stamp da
+# votes. A reader keeping only the first 25 rows loses the whole rubber stamp.
+TRUNC="$TMP/truncating.jsonl"
+add_votes "$TRUNC" 13 qa HOLD
+add_votes "$TRUNC" 12 qa OVERTURN
+add_votes "$TRUNC" 25 da HOLD
+t_lines="$(grep -cE '"panelists"[[:space:]]*:[[:space:]]*\[[[:space:]]*\{' "$TRUNC")"
+[ "${t_lines:-0}" -eq 50 ] || { echo "$NAME: FAIL — expected 50 vote lines in $TRUNC, counted $t_lines"; exit 1; }
+
+TREE2="$TMP/tree-truncating"
+make_tree "$TREE2"
+TREE2_EVAL="$TREE2/.claude/evals/panel-dissent-health.sh"
+TREE2_STATS="$TREE2/.claude/skills/validate-recommendation/panel/stats.py"
+
+# Control: with the reader intact the rubber stamp IS visible and the eval
+# catches it. Without this the next case cannot tell "the guard fired" from
+# "the fixture was never unhealthy in the first place".
+run_case "fake tree, reader intact, rubber stamp visible -> FAIL" 1 \
+  "EVAL panel-dissent-health: FAIL — 1 of 2 scored panelist(s) at exactly 0% or 100% dissent; the panel is not deliberating" \
+  "$TRUNC" 25 "" "$TREE2_EVAL"
+
+# Keep only the first 25 rows: qa survives at 48% dissent and looks healthy,
+# da disappears from the report entirely. This one wraps rather than rewrites,
+# because the truncation has to happen AFTER a real read - rewriting the first
+# line of the body would return an empty list and reproduce case 8 instead.
+truncate_reader "$TREE2_STATS" 25
+
+run_case "fake tree, reader truncates the log -> FAIL, never an affirmative PASS" 1 \
+  "EVAL panel-dissent-health: FAIL — the reader accounted for 25 vote(s) but $TRUNC carries 50; load_rows is dropping data and the metric is grading a subset" \
+  "$TRUNC" 25 "" "$TREE2_EVAL"
+
 # ----------------------------------------------------------------- verdict ---
-if [ "$cases" -ne 9 ]; then
-  echo "$NAME: FAIL — expected 9 cases, ran $cases"
+if [ "$cases" -ne 11 ]; then
+  echo "$NAME: FAIL — expected 11 cases, ran $cases"
   exit 1
 fi
 if [ "$fails" -eq 0 ]; then

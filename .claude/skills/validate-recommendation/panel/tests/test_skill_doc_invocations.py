@@ -1,4 +1,4 @@
-"""SKILL.md's runnable blocks must invoke the panel package, not shadow it.
+"""SKILL.md's runnable commands must invoke the panel package, not shadow it.
 
 The skill exports `PYTHONPATH="$HOME/.claude"` so that `import tool` resolves.
 That makes cwd load-bearing for every `python -m panel` call: from any
@@ -12,51 +12,103 @@ real code package:
     directly executed
 
 The command exits 1 and writes nothing. SKILL.md's documented failure
-behaviour is to fall back to asking the original question, so a block that
+behaviour is to fall back to asking the original question, so a command that
 lost its `cd` makes the panel silently stop working while looking normal.
-This test is the guard: every `-m panel` call inside a ```bash block must be
-preceded, in that same block, by the cd into the skill directory.
+
+Fencing is not the boundary — a command told to a reader in prose is run just
+the same, and `cd` does not persist between Bash tool calls, so an earlier
+step's `cd` covers nothing. Hence two rules:
+
+  * inside a ```bash block, the `cd` may appear earlier in that same block;
+  * anywhere else, the command must carry the `cd` itself, on its own line.
+
+A `-m panel` followed by an ellipsis (`python -m panel …`) is a reference to
+the CLI, not a call, and is not checked.
 """
+import re
 from pathlib import Path
 
 SKILL_DIR = Path(__file__).resolve().parent.parent.parent
 SKILL_MD = SKILL_DIR / "SKILL.md"
 CD_LINE = 'cd "${HOME}/.claude/skills/validate-recommendation"'
 
-
-def _bash_blocks(text: str) -> list[tuple[int, list[str]]]:
-    """Return (1-based start line, lines) for every ```bash fenced block."""
-    blocks: list[tuple[int, list[str]]] = []
-    current: list[str] | None = None
-    start = 0
-    for n, line in enumerate(text.splitlines(), start=1):
-        if current is None:
-            if line.strip() == "```bash":
-                current, start = [], n
-        elif line.strip() == "```":
-            blocks.append((start, current))
-            current = None
-        else:
-            current.append(line)
-    return blocks
+# An invocation names a subcommand. `-m panel …` and `-m panel ...` do not.
+_INVOCATION_RE = re.compile(r"-m\s+panel\s+([A-Za-z][\w-]*)")
 
 
-def test_every_module_panel_call_in_a_bash_block_cds_to_the_skill_dir():
-    blocks = _bash_blocks(SKILL_MD.read_text(encoding="utf-8"))
+def scan_invocations(text: str) -> tuple[int, list[str]]:
+    """Return (invocations seen, "line N: ..." for each one missing its cd)."""
+    lines = text.splitlines()
     offenders: list[str] = []
     found = 0
-    for start, lines in blocks:
-        for i, line in enumerate(lines):
-            # A shell comment explaining the trap is not an invocation of it.
-            if "-m panel" not in line or line.lstrip().startswith("#"):
+    in_block = False
+    block_body_start = 0
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if not in_block:
+            if stripped == "```bash":
+                in_block, block_body_start = True, i + 1
                 continue
-            found += 1
-            if not any(CD_LINE in earlier for earlier in lines[:i]):
-                offenders.append(f"SKILL.md:{start + 1 + i}: {line.strip()}")
-    # Guard the guard: a parser that finds nothing would pass vacuously.
-    assert found >= 4, f"expected >=4 `-m panel` calls in bash blocks, found {found}"
+        elif stripped == "```":
+            in_block = False
+            continue
+        if not _INVOCATION_RE.search(line):
+            continue
+        # A shell comment explaining the trap is not an invocation of it.
+        if in_block and stripped.startswith("#"):
+            continue
+        found += 1
+        if in_block:
+            guarded = any(CD_LINE in earlier for earlier in lines[block_body_start:i])
+        else:
+            guarded = CD_LINE in line
+        if not guarded:
+            offenders.append(f"line {i + 1}: {stripped}")
+    return found, offenders
+
+
+def test_skill_md_has_no_unguarded_panel_invocation():
+    found, offenders = scan_invocations(SKILL_MD.read_text(encoding="utf-8"))
+    # Guard the guard: a parser that matches nothing would pass vacuously.
+    assert found, "scanner found no `-m panel` invocations in SKILL.md at all"
     assert not offenders, (
-        "these `python -m panel` calls run from an unknown cwd and would load "
-        "the ~/.claude/panel CONFIG directory as a namespace package:\n  "
+        "these `python -m panel` commands run from an unknown cwd and would "
+        "load the ~/.claude/panel CONFIG directory as a namespace package:\n  "
         + "\n  ".join(offenders)
     )
+
+
+def test_scanner_flags_a_missing_cd_in_prose_as_well_as_in_a_block():
+    """Both code paths, pinned on a fixture so SKILL.md edits cannot rot it.
+
+    The prose path is the one that matters here: the first version of this
+    guard read fenced blocks only, and SKILL.md's documented lint-config
+    fallback — a real command, in prose — was unguarded the whole time.
+    """
+    fixture = (
+        "Prose that only mentions `python3.12 -m panel ...` in passing.\n"
+        "\n"
+        "```bash\n"
+        "python3.12 -m panel aggregate --config x\n"
+        "```\n"
+        "\n"
+        "```bash\n"
+        'cd "${HOME}/.claude/skills/validate-recommendation" && \\\n'
+        "    python3.12 -m panel dispatch --panelist da\n"
+        "```\n"
+        "\n"
+        "Run `python3.12 -m panel stats --min-n 5` to see the metric.\n"
+        "\n"
+        'Or `cd "${HOME}/.claude/skills/validate-recommendation" && '
+        "python3.12 -m panel lint-config`.\n"
+    )
+    found, offenders = scan_invocations(fixture)
+
+    # The ellipsis mention is a reference, not a call: 4 invocations, not 5.
+    assert found == 4
+    joined = "\n".join(offenders)
+    assert len(offenders) == 2, joined
+    assert "aggregate" in joined, "missed an unguarded call inside a bash block"
+    assert "stats" in joined, "missed an unguarded call in prose"
+    assert "dispatch" not in joined, "flagged a block call whose cd is earlier in the block"
+    assert "lint-config" not in joined, "flagged a prose call that carries its own cd"

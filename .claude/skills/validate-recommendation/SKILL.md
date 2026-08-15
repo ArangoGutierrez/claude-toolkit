@@ -86,9 +86,12 @@ into a variable; each line is `<id>|<role>|<backend>|<subagent_type>`
 for one enabled panelist.
 
 (If `python3.12 -c` for yaml→json is awkward in your sandbox, the
-equivalent: `python3.12 -m panel lint-config --config "$CONFIG"` prints
-the same data in human-readable form; you can grep its output for the
-`- <id>` lines and extract role/backend from them.)
+equivalent is
+`cd "${HOME}/.claude/skills/validate-recommendation" && python3.12 -m panel lint-config --config "$CONFIG"`,
+which prints the same data in human-readable form; you can grep its output
+for the `- <id>` lines and extract role/backend from them. The `cd` is
+required here too: a Bash tool call does not inherit the cwd of step 1's,
+and without it `panel` resolves to the `~/.claude/panel` config directory.)
 
 ### 2a. Resolve the panel profile
 

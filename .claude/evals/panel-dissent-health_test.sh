@@ -73,6 +73,16 @@ add_votes() {
   for ((i = 0; i < n; i++)); do vote_row "$pid" "$verdict" >> "$path"; done
 }
 
+# One decision line carrying THREE panelist votes — the shape the live panel
+# writes now. $1 path, $2 count, $3 verdict for all three.
+add_votes3() {
+  local path="$1" n="$2" verdict="$3" i
+  for ((i = 0; i < n; i++)); do
+    printf '{"event":"decision","verdict":"HOLD","panelists":[{"id":"da","role":"DA","verdict":"%s"},{"id":"pe","role":"PE","verdict":"%s"},{"id":"qa","role":"QA","verdict":"%s"}]}\n' \
+      "$verdict" "$verdict" "$verdict" >> "$path"
+  done
+}
+
 # $1 case name, $2 expected rc, $3 the EXACT expected last stdout line,
 # $4 log path, $5 min-n, $6 EVAL_SUBJECT ("" = unset, default resolution),
 # $7 the eval to run (defaults to the repo copy).
@@ -301,9 +311,28 @@ run_case "fake tree, reader truncates the log -> FAIL, never an affirmative PASS
   "EVAL panel-dissent-health: FAIL — the reader accounted for 25 vote(s) but $TRUNC carries 50; load_rows is dropping data and the metric is grading a subset" \
   "$TRUNC" 25 "" "$TREE2_EVAL"
 
+# ------------------- case 12: three panelists on one line must not false-FAIL ---
+# The vote-accounting guard compares vote OBJECTS, and this is what forces
+# that. A guard written against vote-carrying LINES agrees with the object
+# count on every fixture above - they all put one panelist on one line - and
+# only diverges here, on the shape the live panel actually writes. The
+# operator's log carries 339 such lines but 357 votes, so a line-based
+# comparison would fail it on every run.
+MULTI="$TMP/multi-panelist.jsonl"
+add_votes3 "$MULTI" 5 HOLD
+add_votes3 "$MULTI" 5 OVERTURN
+m_lines="$(grep -cE '"panelists"[[:space:]]*:[[:space:]]*\[[[:space:]]*\{' "$MULTI")"
+m_votes="$(grep -oE '"id"[[:space:]]*:' "$MULTI" | grep -c .)"
+[ "${m_lines:-0}" -eq 10 ] && [ "${m_votes:-0}" -eq 30 ] || {
+  echo "$NAME: FAIL — the multi-panelist fixture must hold 10 lines and 30 votes, got $m_lines and $m_votes"
+  exit 1; }
+run_case "10 lines carrying 30 votes, all healthy -> PASS" 0 \
+  "EVAL panel-dissent-health: PASS — all 3 scored panelist(s) dissent inside the band (min-n=10)" \
+  "$MULTI" 10 "$SUBJECT"
+
 # ----------------------------------------------------------------- verdict ---
-if [ "$cases" -ne 11 ]; then
-  echo "$NAME: FAIL — expected 11 cases, ran $cases"
+if [ "$cases" -ne 12 ]; then
+  echo "$NAME: FAIL — expected 12 cases, ran $cases"
   exit 1
 fi
 if [ "$fails" -eq 0 ]; then

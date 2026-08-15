@@ -149,6 +149,35 @@ def test_blinded_personas_ask_for_choice_not_verdict(role):
         )
 
 
+@pytest.mark.parametrize("role", ["PE", "QA"])
+def test_blinded_personas_scope_their_reading_to_the_principles(role):
+    """Blinding is enforced in the prompt; these seats are agents with tools.
+
+    While a blinded panelist runs, the withheld option is sitting in guessable
+    paths: the hook's session state file, the per-question payload (which
+    carries the label AND the stated reasoning verbatim), and the DA's own
+    unblinded prompt file. Nothing hands those paths over — but "we did not
+    tell it where to look" is not an access control, and these personas
+    explicitly instruct the seat to USE YOUR TOOLS. These sentences are the
+    only thing in the system that scopes that tool use, so deleting them
+    silently converts blinding from a property of the system into a property
+    of the panelist's incuriosity.
+    """
+    p = load_persona_by_role(role)
+    combined = p.system_prompt + p.one_shot_example + p.user_prompt_template
+    flat = " ".join(combined.split())
+    for required in (
+        "Your reading is scoped to the principles named above.",
+        "only from the options quoted in the prompt",
+        "do not grep the filesystem for one",
+    ):
+        assert required in flat, (
+            f"{role} persona must keep the input-scoping instruction {required!r}: "
+            f"without it a blinded seat is free to read the session state file or "
+            f"the DA's prompt and un-blind itself"
+        )
+
+
 def test_da_persona_still_asks_for_a_verdict():
     p = load_persona_by_role("DA")
     combined = p.system_prompt + p.one_shot_example + p.user_prompt_template

@@ -67,6 +67,33 @@ def scan_invocations(text: str) -> tuple[int, list[str]]:
     return found, offenders
 
 
+def invoked_subcommands(text: str) -> set[str]:
+    """Every `panel <subcommand>` the document tells a reader to run."""
+    return {m.group(1) for m in _INVOCATION_RE.finditer(text)}
+
+
+def test_the_python_invocation_allowlist_covers_every_subcommand_used():
+    """The "what you must NOT do" allowlist must not forbid what the doc instructs.
+
+    SKILL.md reserves `python -m panel` for a named list of subcommands. The
+    list and the instructions live 300 lines apart, so a subcommand added to
+    one and not the other reads as a prohibition on the skill's own happy
+    path — which is exactly what happened to `build-prompt`, the call the
+    entire blinding property depends on.
+    """
+    text = SKILL_MD.read_text(encoding="utf-8")
+    m = re.search(r"Python invocation is reserved for(.*?)\n-", text, re.DOTALL)
+    assert m, "the 'Python invocation is reserved for' rule moved or was reworded"
+    reserved = m.group(1)
+    used = invoked_subcommands(text)
+    assert used, "scanner found no `-m panel <subcommand>` calls at all"
+    missing = sorted(s for s in used if f"`{s}`" not in reserved)
+    assert not missing, (
+        f"SKILL.md invokes {missing} but its allowlist does not permit them: "
+        f"the document forbids what it instructs"
+    )
+
+
 def test_skill_md_has_no_unguarded_panel_invocation():
     found, offenders = scan_invocations(SKILL_MD.read_text(encoding="utf-8"))
     # Guard the guard: a parser that matches nothing would pass vacuously.

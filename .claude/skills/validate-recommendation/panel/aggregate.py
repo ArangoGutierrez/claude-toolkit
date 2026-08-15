@@ -15,6 +15,7 @@ from dataclasses import asdict
 from pathlib import Path
 
 from panel.config import load_config
+from panel.prompt import strip_marker
 from panel.severity import decide, ParsedVerdict
 from panel.verdict import parse_verdict_file
 from panel.trace import log_verdict
@@ -56,11 +57,15 @@ def aggregate(
             ))
             continue
         v = parse_verdict_file(f)
+        if p.blind:
+            verdict, rationale, alternative = _map_blinded_choice(v, recommended_label)
+        else:
+            verdict, rationale, alternative = v.verdict, v.rationale, v.alternative
         parsed.append(ParsedVerdict(
             id=p.id, role=p.role,
-            verdict=v.verdict,
-            rationale=v.rationale,
-            alternative=v.alternative,
+            verdict=verdict,
+            rationale=rationale,
+            alternative=alternative,
         ))
 
     directive = decide(cfg, parsed, cycle=None)
@@ -69,6 +74,23 @@ def aggregate(
 
     payload = _to_serializable_dict(directive)
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def _map_blinded_choice(v, recommended_label: str):
+    """Translate a blinded panelist's CHOICE into the frozen verdict contract.
+
+    A blinded panelist never saw which option was recommended, so it answers
+    with the option it considers best. Agreement with the recommendation is
+    HOLD; disagreement is OVERTURN naming that option as the alternative.
+    Comparison is marker- and case-insensitive because the panelist was
+    shown marker-stripped labels.
+    """
+    choice = strip_marker((v.choice or "").strip())
+    if not choice:
+        return "ERROR", (v.rationale or "blinded panelist emitted no CHOICE"), "n/a"
+    if choice.casefold() == strip_marker(recommended_label).casefold():
+        return "HOLD", v.rationale, "n/a"
+    return "OVERTURN", v.rationale, choice
 
 
 def _record_decision(cfg, directive, recommended_label: str, question_id: str | None) -> None:

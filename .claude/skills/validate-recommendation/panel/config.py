@@ -32,6 +32,7 @@ class Panelist:
     max_tokens: int = 32768
     temperature: float = 0.3
     timeout_seconds: int = 60
+    blind: bool = False       # hide the recommendation from this panelist
 
 
 @dataclass
@@ -112,6 +113,17 @@ def load_config(path: str | Path) -> Config:
                 f"config: panelists[{i}].subagent_type is required for "
                 f"backend 'claude-subagent'"
             )
+        blind = bool(p.get("blind", False))
+        if blind and backend.startswith("nat-"):
+            # dispatch.py rewrites any reply without a VERDICT line to
+            # ERROR, and a blinded panelist replies with CHOICE. Such a
+            # seat would return ERROR on every question, so fail loud here
+            # rather than silently at dispatch time.
+            raise ConfigError(
+                f"config: panelists[{i}] (id '{pid}') sets blind: true, which "
+                f"backend '{backend}' does not support. Blinding is only "
+                f"supported on the 'claude-subagent' backend today."
+            )
         panelists.append(Panelist(
             id=pid,
             role=p.get("role", ""),
@@ -122,6 +134,7 @@ def load_config(path: str | Path) -> Config:
             max_tokens=int(p.get("max_tokens", 32768)),
             temperature=float(p.get("temperature", 0.3)),
             timeout_seconds=int(p.get("timeout_seconds", 60)),
+            blind=blind,
         ))
 
     enabled_count = sum(1 for p in panelists if p.enabled)

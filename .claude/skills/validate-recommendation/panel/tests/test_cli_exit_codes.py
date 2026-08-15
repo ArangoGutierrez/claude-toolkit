@@ -13,7 +13,12 @@ from pathlib import Path
 
 
 SKILL_DIR = Path(__file__).resolve().parent.parent.parent
-PYTHON = "/opt/homebrew/bin/python3.12"
+# The interpreter running the suite, never a hard-coded path. A literal
+# /opt/homebrew/... exists only on this developer's Mac: everywhere else -
+# any CI runner, any Linux box - these four tests die with FileNotFoundError
+# before they assert anything. sys.executable also keeps the subprocess on
+# the same interpreter (and therefore the same PYTHONPATH) as the parent.
+PYTHON = sys.executable
 
 
 def _run(args, cwd=SKILL_DIR):

@@ -31,6 +31,9 @@ jobs:
       - name: Routing-eval harness
         run: bash .claude/evals/no-sonnet-routing_test.sh
 
+      # Heads-up for whoever reads a green run: panel-dissent-health is a
+      # PERMANENT SKIP here. It grades a decisions log under $HOME that no
+      # runner has. See the panel-tests job below.
       - name: Eval suite
         run: bash scripts/run-evals.sh
 
@@ -39,3 +42,46 @@ jobs:
 
       - name: Fail if the docs drifted from what ships
         run: git diff --exit-code docs/patterns/workflow-library.md
+
+  panel-tests:
+    name: validate-recommendation panel suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      # requests and pydantic are not optional. tool/__init__.py eagerly imports
+      # tool.backends (requests) and tool.tools (pydantic), and panel/dispatch.py
+      # imports tool.backends at module level, so 23 tests fail on import
+      # without them. This list is the set of third-party top-level modules a
+      # real run loads, minus everything pip resolves transitively.
+      - name: Install test dependencies
+        run: python -m pip install --quiet pytest pyyaml requests pydantic
+
+      # PYTHONPATH points at the CHECKOUT, never $HOME/.claude. The `tool`
+      # package lives at .claude/tool in this repo; a job resolving $HOME would
+      # grade the deployed copy rather than the committed source.
+      - name: Run the panel suite
+        working-directory: .claude/skills/validate-recommendation
+        env:
+          PYTHONPATH: ${{ github.workspace }}/.claude
+        run: python -m pytest panel/tests/ -q
+
+      # Sibling harness for .claude/evals/panel-dissent-health.sh. It drives
+      # `panel stats` and so needs the interpreter set up above, which is why it
+      # runs here instead of alongside the other harnesses in the gates job.
+      #
+      # LIMITATION - CI does NOT cover the dissent-health metric itself. The
+      # eval grades $HOME/.claude/panel/decisions.jsonl, real operator data no
+      # runner has, so run-evals.sh reports SKIP for it on every run, forever.
+      # It grades locally, on the weekly run-evals.sh sweep. This harness, which
+      # feeds the eval fixture logs, is the only automated coverage its logic
+      # gets: a green CI run says nothing about the health of the live panel.
+      - name: Dissent-health eval harness
+        env:
+          PANEL_HEALTH_PYTHON: python
+        run: bash .claude/evals/panel-dissent-health_test.sh

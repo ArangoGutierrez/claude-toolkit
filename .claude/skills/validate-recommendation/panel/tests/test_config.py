@@ -14,6 +14,8 @@ import textwrap
 
 import pytest
 
+from panel.config import load_config
+
 
 def _write_yaml(tmp_path, content):
     p = tmp_path / "config.yml"
@@ -282,3 +284,86 @@ def test_panelist_id_required(tmp_path):
     """)
     with pytest.raises(ConfigError, match=r"id"):
         load_config(cfg)
+
+
+def test_panelist_blind_defaults_false_and_parses_true(tmp_path):
+    cfg_file = tmp_path / "config.yml"
+    cfg_file.write_text(
+        "version: 1\n"
+        "panelists:\n"
+        "  - id: da\n"
+        "    role: DA\n"
+        "    enabled: true\n"
+        "    backend: nat-nim\n"
+        "    model: m\n"
+        "  - id: pe\n"
+        "    role: PE\n"
+        "    enabled: true\n"
+        "    backend: claude-subagent\n"
+        "    subagent_type: principal-engineer\n"
+        "    blind: true\n"
+        "  - id: qa\n"
+        "    role: QA\n"
+        "    enabled: true\n"
+        "    backend: claude-subagent\n"
+        "    subagent_type: qa-engineer\n"
+        "    blind: true\n",
+        encoding="utf-8",
+    )
+    cfg = load_config(cfg_file)
+    by_id = {p.id: p for p in cfg.panelists}
+    assert by_id["da"].blind is False, "omitted blind must default to False"
+    assert by_id["pe"].blind is True
+    assert by_id["qa"].blind is True
+
+
+def test_blind_on_a_nat_backend_is_rejected(tmp_path):
+    """A blinded nat-* panelist is silently dead at runtime, so reject it at load.
+
+    dispatch.py parses the model reply with parse_verdict and writes
+    'VERDICT: ERROR / panelist response missing VERDICT field' whenever the
+    reply carries no VERDICT line. A blinded panelist answers with CHOICE, and
+    _format_verdict has no CHOICE path, so every verdict from such a seat would
+    be ERROR on every question. Only claude-subagent has a blinded path today.
+    """
+    from panel.config import load_config, ConfigError
+    cfg = _write_yaml(tmp_path, """
+        version: 1
+        panelists:
+          - id: pe-nim
+            role: PE
+            enabled: true
+            backend: nat-nim
+            model: example-org/example-model
+            blind: true
+    """)
+    with pytest.raises(ConfigError) as exc:
+        load_config(cfg)
+    assert str(exc.value) == (
+        "config: panelists[0] (id 'pe-nim') sets blind: true, which backend "
+        "'nat-nim' does not support. Blinding is only supported on the "
+        "'claude-subagent' backend today."
+    )
+
+
+def test_blind_on_a_claude_subagent_backend_still_loads(tmp_path):
+    """The discriminating half of the guard above.
+
+    A guard that rejected ALL blinding would satisfy the rejection test while
+    breaking every shipped blinded seat. This pins that claude-subagent
+    blinding — the configuration the ensemble actually ships — still loads.
+    """
+    cfg = _write_yaml(tmp_path, """
+        version: 1
+        panelists:
+          - id: pe
+            role: PE
+            enabled: true
+            backend: claude-subagent
+            subagent_type: principal-engineer
+            blind: true
+    """)
+    c = load_config(cfg)
+    by_id = {p.id: p for p in c.panelists}
+    assert by_id["pe"].blind is True
+    assert by_id["pe"].backend == "claude-subagent"

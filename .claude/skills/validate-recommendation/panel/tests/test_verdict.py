@@ -2,6 +2,8 @@
 import pytest
 from pathlib import Path
 
+from panel.verdict import parse_verdict
+
 
 def test_parse_hold_verdict(fixtures_dir, tmp_path):
     from panel.verdict import parse_verdict_file
@@ -41,3 +43,17 @@ def test_parse_strips_field_prefix(tmp_path):
     assert v.verdict == "HOLD"
     assert v.rationale == "A short reason here."
     assert v.alternative == "n/a"
+
+
+def test_parse_verdict_extracts_choice_line():
+    text = "CHOICE: Use resty\nRATIONALE: retries are needed\n"
+    v = parse_verdict(text)
+    assert v.choice == "Use resty"
+    assert v.rationale == "retries are needed"
+    assert v.verdict == ""
+
+
+def test_parse_verdict_choice_absent_is_empty_string():
+    v = parse_verdict("VERDICT: HOLD\nRATIONALE: fine\nALTERNATIVE: n/a\n")
+    assert v.choice == ""
+    assert v.verdict == "HOLD"

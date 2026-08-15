@@ -83,7 +83,21 @@ fi
 rows=$(printf '%s\n' "$OUT" | grep -cE 'n=[0-9]+' || true)
 parsed=$(printf '%s\n' "$OUT" | grep -cE '(OK|UNHEALTHY|SKIP)$' || true)
 
+# Count the vote-carrying lines in the RAW log, independently of the reader.
+# This is the whole point: if load_rows breaks, `panel stats` reports nothing
+# and every count above reads 0, so the eval would SKIP — green — against a
+# log full of rubber stamps. Deriving the expected row count straight from the
+# file is the only way the eval can tell "nothing to grade" apart from "I have
+# stopped grading". A trailing `{` is required so a decision recorded with an
+# empty panelists array is not mistaken for a vote.
+log_voters=$(grep -cE '"panelists"[[:space:]]*:[[:space:]]*\[[[:space:]]*\{' "$JSONL" || true)
+
 if [ "$rows" -eq 0 ]; then
+  if [ "$log_voters" -gt 0 ]; then
+    echo "$OUT"
+    echo "EVAL $NAME: FAIL — the reader returned no panelist rows, but $JSONL carries $log_voters line(s) of panelist votes; load_rows is broken (or every such line is malformed) and the metric is measuring nothing"
+    exit 1
+  fi
   echo "EVAL $NAME: SKIP — no panelist votes recorded in $JSONL"
   exit 2
 fi

@@ -307,7 +307,7 @@ if [ "$cases" -ne 11 ]; then
   exit 1
 fi
 if [ "$fails" -eq 0 ]; then
-  echo "$NAME: PASS — $cases/$cases cases; the eval flips on both rails, passes inside the band, skips below min-n and on an absent or voteless log, resolves its subject from the script directory, and refuses to stay green when the reader returns nothing"
+  echo "$NAME: PASS — $cases/$cases cases; the eval flips on both rails, passes inside the band, skips below min-n and on an absent or voteless log, resolves its subject from the script directory, and refuses to stay green when the reader returns nothing or only part of the log"
   exit 0
 fi
 echo "$NAME: FAIL — $fails of $cases cases wrong"

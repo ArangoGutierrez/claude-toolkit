@@ -73,6 +73,10 @@ edit_payload() {   # <file_path> <new_string>
 notebook_payload() {  # <notebook_path> <new_source>
     printf '{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"%s","new_source":"%s"}}' "$1" "$2"
 }
+bash_payload() {   # <command> ; shell commands carry quotes, so escape them for JSON
+    local cmd=${1//\"/\\\"}
+    printf '{"tool_name":"Bash","tool_input":{"command":"%s"}}' "$cmd"
+}
 
 F="$TMP/doc.md"
 
@@ -183,6 +187,176 @@ expect_block "test19 multi-line-number" \
 expect_block "test19 multi-first-category" \
     "$(write_payload "$F" "intro $EMOJI\nplain middle line\nclosing ${EMDASH} end")" \
     "emoji: \"$EMOJI\" (line 1)"
+
+# =====================================================================
+# Fix round. Everything below pins a behaviour that a mutation could break
+# while the original 22 cases stayed green.
+# =====================================================================
+
+# --- FIX-1: a detected tell must never become an allow ---
+
+# 22: a lone surrogate in the path makes the utf-8 encode of the block message
+# fail. Detection has already found the em-dash, so the verdict must stay 2.
+# The old blanket except around reporting turned this into a silent allow.
+SURROGATE=$(printf '\\u%s' 'd83d')
+expect_block "test22 report-failure-still-blocks" \
+    "$(write_payload "/tmp/${SURROGATE}.md" "a ${EMDASH} b")" \
+    'em-dash:'
+
+# --- FIX-2: the block message is bounded ---
+
+# 23: every byte of this becomes Claude's feedback, so it has to stay small.
+# 20k lines x 3 filler words used to emit 2,366,916 bytes.
+BIG=$(awk 'BEGIN{for(i=0;i<20000;i++) printf "a comprehensive robust seamless line\\n"}')
+TOTAL=$((TOTAL + 1))
+run "$(write_payload "$F" "$BIG")"
+[ "$RC" = 2 ] || fail "test23 flood rc" "expected 2, got $RC"
+BYTES=$(printf '%s' "$ERR" | wc -c | tr -d ' ')
+[ "$BYTES" -lt 8192 ] || fail "test23 flood size" "stderr was $BYTES bytes, want < 8192"
+case "$ERR" in
+    *"and "*"more"*) ;;
+    *) fail "test23 flood summary" "no 'and N more' line in: $ERR" ;;
+esac
+
+# 24: one match can be huge on its own, because \s* in the trailer regex
+# swallows a whitespace run. The matched text has to be clipped.
+LONG_TRAILER="Co-Authored-By:$(awk 'BEGIN{for(i=0;i<200;i++) printf " "}')Claude"
+TOTAL=$((TOTAL + 1))
+run "$(write_payload "$F" "$LONG_TRAILER")"
+[ "$RC" = 2 ] || fail "test24 clip rc" "expected 2, got $RC"
+LONGEST=$(printf '%s' "$ERR" | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }')
+[ "$LONGEST" -le 120 ] || fail "test24 clip" "longest stderr line is $LONGEST chars, want <= 120"
+
+# --- FIX-3: the env escape hatch is the EXACT string "off" ---
+
+# 25: anything else still blocks. A truthy check would disable the guard for
+# anyone who sets AI_TELL_GUARD=1 and no test would notice.
+for V in on 1 OFF Off ""; do
+    expect_block "test25 env-not-off[$V]" \
+        "$(write_payload "$F" "ship it $EMOJI")" 'emoji:' AI_TELL_GUARD="$V"
+done
+
+# --- FIX-3: every path exemption has its own case ---
+
+# 26: one per entry in EXEMPT_PATH_PARTS
+for P in testdata fixtures locales i18n node_modules .git; do
+    expect_allow "test26 exempt-path[$P]" "$(write_payload "$TMP/$P/x.md" "tell $EMOJI")"
+done
+
+# 27: one per entry in EXEMPT_SUFFIXES
+expect_allow "test27 exempt[.snap]" "$(write_payload "$TMP/a.snap" "tell $EMOJI")"
+expect_allow "test27 exempt[.lock]" "$(write_payload "$TMP/a.lock" "tell $EMOJI")"
+expect_allow "test27 exempt[.min.js]" "$(write_payload "$TMP/a.min.js" "tell $EMOJI")"
+expect_allow "test27 exempt[package-lock.json]" "$(write_payload "$TMP/package-lock.json" "tell $EMOJI")"
+expect_allow "test27 exempt[go.sum]" "$(write_payload "$TMP/go.sum" "tell $EMOJI")"
+
+# 28: FIX-4, the two full-filename entries match on basename, not endswith
+expect_block "test28 not-package-lock" \
+    "$(write_payload "$TMP/my-package-lock.json" "tell $EMOJI")" 'emoji:'
+expect_block "test28 not-go-sum" "$(write_payload "$TMP/notgo.sum" "tell $EMOJI")" 'emoji:'
+
+# --- FIX-3: matching is case-insensitive ---
+
+# 29: dropping re.IGNORECASE has to turn these red
+expect_block "test29 upper-word" "$(write_payload "$F" "A COMPREHENSIVE rewrite")" \
+    'filler-word: "COMPREHENSIVE" (line 1)'
+expect_block "test29 upper-trailer" "$(write_payload "$F" "CO-AUTHORED-BY: CLAUDE")" \
+    'claude-trailer: "CO-AUTHORED-BY: CLAUDE" (line 1)'
+expect_block "test29 lower-trailer" "$(write_payload "$F" "co-authored-by: claude")" \
+    'claude-trailer: "co-authored-by: claude" (line 1)'
+expect_block "test29 upper-generated" \
+    "$(write_payload "$F" "GENERATED WITH [CLAUDE CODE]")" 'claude-trailer:'
+
+# --- FIX-3: the wordlist and phraselist contents are pinned ---
+# The literals below are duplicated from the subject on purpose. The point is to
+# pin WHICH words ship, so deleting 22 of the 24 has to turn the suite red.
+
+WORDS=(comprehensive robust seamless seamlessly leverage leverages leveraging
+       utilize utilizes utilizing delve intricate crucial pivotal meticulous
+       meticulously showcase realm testament elevate embark furthermore moreover
+       underscore)
+TOTAL=$((TOTAL + 1))
+[ "${#WORDS[@]}" -eq 24 ] || fail "test30 wordlist-size" "harness lists ${#WORDS[@]}, want 24"
+for W in "${WORDS[@]}"; do
+    expect_block "test30 word[$W]" "$(write_payload "$F" "the $W here")" \
+        "filler-word: \"$W\" (line 1)"
+done
+
+PHRASES=("You're absolutely right"
+         "You are absolutely right"
+         "I apologize for the confusion"
+         "It's worth noting that"
+         "It is worth noting that"
+         "delve into"
+         "In today's fast-paced world"
+         "Let me know if you need anything else"
+         "I hope this helps"
+         "As an AI"
+         "It's important to note")
+TOTAL=$((TOTAL + 1))
+[ "${#PHRASES[@]}" -eq 11 ] || fail "test31 phraselist-size" "harness lists ${#PHRASES[@]}, want 11"
+for P in "${PHRASES[@]}"; do
+    expect_block "test31 phrase[$P]" "$(write_payload "$F" "x $P y")" \
+        "filler-phrase: \"$P\" (line 1)"
+done
+
+# --- FIX-3: one codepoint from each of the six emoji ranges ---
+
+# 32: deleting any single range has to turn one of these red
+expect_block "test32 emoji[U+1F680 in 1F300-1FAFF]" \
+    "$(write_payload "$F" "x $(printf '\xf0\x9f\x9a\x80') y")" 'emoji:'
+expect_block "test32 emoji[U+1F004 in 1F000-1F0FF]" \
+    "$(write_payload "$F" "x $(printf '\xf0\x9f\x80\x84') y")" 'emoji:'
+expect_block "test32 emoji[U+1F1E8 in 1F1E6-1F1FF]" \
+    "$(write_payload "$F" "x $(printf '\xf0\x9f\x87\xa8') y")" 'emoji:'
+expect_block "test32 emoji[U+2600 in 2600-27BF]" \
+    "$(write_payload "$F" "x $(printf '\xe2\x98\x80') y")" 'emoji:'
+expect_block "test32 emoji[U+2B50 in 2B00-2BFF]" \
+    "$(write_payload "$F" "x $(printf '\xe2\xad\x90') y")" 'emoji:'
+expect_block "test32 emoji[U+FE0F]" \
+    "$(write_payload "$F" "x $(printf '\xef\xb8\x8f') y")" 'emoji:'
+
+# --- FIX-4: exemptions are checked on the normalized path ---
+
+# 33: traversal must not buy an exemption
+expect_block "test33 traversal-git" \
+    "$(write_payload "/repo/.git/../src/main.go" "tell $EMOJI")" 'emoji:'
+expect_block "test33 traversal-testdata" \
+    "$(write_payload "/repo/testdata/../src/x.md" "tell $EMOJI")" 'emoji:'
+# the genuine forms stay exempt
+expect_allow "test33 real-git-path" "$(write_payload "/repo/.git/config" "tell $EMOJI")"
+expect_allow "test33 real-testdata-path" "$(write_payload "/repo/testdata/x.md" "tell $EMOJI")"
+
+# --- FIX-4: trailers match across a line break, with the right line number ---
+
+# 34: \s* in the regex includes a newline, so per-line scanning missed this.
+# The trailer starts on line 3, which pins the offset-to-line conversion.
+expect_block "test34 trailer-across-newline" \
+    "$(write_payload "$F" "alpha\nbeta\nCo-Authored-By:\nClaude")" 'claude-trailer:'
+expect_block "test34 trailer-newline-lineno" \
+    "$(write_payload "$F" "alpha\nbeta\nCo-Authored-By:\nClaude")" '(line 3)'
+
+# --- FIX-5: the Bash commit-trailer bypass ---
+
+# 35: trailers are scanned in a Bash command, so `git commit -m` cannot smuggle
+# one past the guard.
+expect_block "test35 bash-trailer" \
+    "$(bash_payload 'git commit -m "feat: x" -m "Co-Authored-By: Claude <x@y>"')" \
+    'claude-trailer: "Co-Authored-By: Claude"'
+expect_block "test35 bash-generated" \
+    "$(bash_payload 'git commit -m "Generated with [Claude Code]"')" \
+    'claude-trailer: "Generated with [Claude Code]"'
+expect_allow "test35 bash-clean-commit" "$(bash_payload 'git commit -m "feat: x"')"
+
+# 36: ONLY trailers are scanned on the Bash path. Blocking filler, em-dashes or
+# emoji in a command would break grep, sed and echo for no benefit.
+expect_allow "test36 bash-filler-not-scanned" "$(bash_payload 'grep -rn "comprehensive" .')"
+expect_allow "test36 bash-emdash-not-scanned" "$(bash_payload "sed -i 's/x/${EMDASH}/' f.txt")"
+expect_allow "test36 bash-emoji-not-scanned" "$(bash_payload "echo $EMOJI")"
+
+# 37: the env escape hatch still applies on the Bash path
+expect_allow "test37 bash-env-off" \
+    "$(bash_payload 'git commit -m "Co-Authored-By: Claude"')" AI_TELL_GUARD=off
 
 if [ "$FAILED" -ne 0 ]; then
     echo "FAILED ai-tell-guard_test: $FAILED failed assertions across $TOTAL cases"

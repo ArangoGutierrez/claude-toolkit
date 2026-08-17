@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Generate a structured handoff prompt to start a fresh session with full context. Use when context window approaches limit or before ending a long session. `/handoff --epic` instead produces an epic-launch brief for a session that must drive a large goal to completion autonomously.
+description: Generate a structured handoff prompt to start a fresh session with full context. Use ONLY when the user explicitly requests a handoff (or asks to wrap up/end the session); never invoke it on your own judgment because a task finished or context feels long. `/handoff --epic` instead produces an epic-launch brief for a session that must drive a large goal to completion autonomously.
 user-invocable: true
 tools:
   - Bash
@@ -15,9 +15,21 @@ Generates a handoff document at `~/.claude/audit/handoffs/YYYY-MM-DD-HHMM-handof
 
 ## When to use
 
-- When you notice context approaching the limit (e.g., after the `context-watch` hook nudges you).
-- Before manually ending a long session that you intend to resume.
-- After completing a significant chunk of work where the next session needs to pick up exactly where this one left off.
+**The user decides, not you.** This skill is invoked ONLY when the user explicitly requests
+a handoff — `/handoff`, "hand off", "wrap up", "end the session". There is no self-service
+path into it.
+
+- The user asks for a handoff, in any wording.
+- The user asks to stop, pause, or resume later.
+
+## When NOT to use — these are not triggers
+
+Finishing a task, closing a milestone, merging a PR, or reaching a "natural stopping point"
+does NOT justify a handoff. Neither does context usage on its own: `context-watch.sh` fires
+an advisory at 90%, and even that is a number to REPORT, not a licence to stop. Below that
+threshold, context is not a topic — do not raise it, do not draft a wrap-up, do not offer
+to hand off. During an explicitly-requested autonomous run, proposing an unrequested handoff
+is a failure; log the ledger and continue to the next task instead.
 
 ## What it does
 

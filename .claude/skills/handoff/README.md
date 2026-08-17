@@ -9,12 +9,23 @@ is skipped rather than the handoff blocking.
 
 ## When to use it
 
-- Context is approaching the limit (e.g., after a `context-watch` hook nudge).
-- You're ending a long session you intend to resume later.
-- You just finished a significant chunk of work and want the next session to
-  start with full context instead of re-deriving it from scratch.
-- **Not for:** mid-task pauses — generating a handoff mid-task creates noise;
-  only run it at session-end or near the context limit.
+**You** run `/handoff`. The assistant does not decide to run it for you.
+
+- You ask for a handoff, in any wording.
+- You're ending or pausing a session you intend to resume later.
+
+## When NOT to use — these are not triggers
+
+- **Finishing a task, a milestone, or a PR.** Completing work is not a reason to
+  stop; the next task is. An assistant that proposes a handoff because a chunk of
+  work finished is interrupting you, not helping.
+- **Context usage on its own.** `context-watch.sh` emits an advisory at 90%, and
+  even that is a number to report, not a licence to stop. Below it, context is
+  not a topic.
+- **Mid-task pauses.** Generating a handoff mid-task creates noise.
+
+During an explicitly-requested autonomous run, proposing an unrequested handoff is
+a failure, not tidiness.
 
 ## Examples
 

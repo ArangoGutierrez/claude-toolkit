@@ -219,13 +219,33 @@ case "$ERR" in
 esac
 
 # 24: one match can be huge on its own, because \s* in the trailer regex
-# swallows a whitespace run. The matched text has to be clipped.
+# swallows a whitespace run. The matched text has to be clipped to 80.
+#
+# Assert on the FINDING lines only, never on the whole of stderr. The header
+# carries the target file path, whose width is driven by $TMPDIR rather than by
+# the clip logic: measuring it made this case pass under a 15 character TMPDIR
+# and fail at 135 characters under the unsandboxed /var/folders/... one. A test
+# that flips on where it runs is worse than no test.
 LONG_TRAILER="Co-Authored-By:$(awk 'BEGIN{for(i=0;i<200;i++) printf " "}')Claude"
 TOTAL=$((TOTAL + 1))
 run "$(write_payload "$F" "$LONG_TRAILER")"
 [ "$RC" = 2 ] || fail "test24 clip rc" "expected 2, got $RC"
-LONGEST=$(printf '%s' "$ERR" | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }')
-[ "$LONGEST" -le 120 ] || fail "test24 clip" "longest stderr line is $LONGEST chars, want <= 120"
+
+# Pull the rendered matched text out from between the quotes.
+FINDING=$(printf '%s\n' "$ERR" | grep '^  claude-trailer: ' | head -1)
+CLIPPED=${FINDING#*\"}
+CLIPPED=${CLIPPED%\" (line*}
+# 221 characters went in; 80 are kept, plus the three character marker.
+[ "${#CLIPPED}" -eq 83 ] || \
+    fail "test24 clip-length" "rendered ${#CLIPPED} chars, want 83 (80 kept + '...')"
+case "$CLIPPED" in
+    "Co-Authored-By:"*"...") ;;
+    *) fail "test24 clip-shape" "unexpected rendering: [$CLIPPED]" ;;
+esac
+LONGEST=$(printf '%s\n' "$ERR" | grep '^  [a-z]' \
+    | awk '{ if (length($0) > m) m = length($0) } END { print m+0 }')
+[ "$LONGEST" -le 120 ] || \
+    fail "test24 finding-width" "longest finding line is $LONGEST chars, want <= 120"
 
 # --- FIX-3: the env escape hatch is the EXACT string "off" ---
 

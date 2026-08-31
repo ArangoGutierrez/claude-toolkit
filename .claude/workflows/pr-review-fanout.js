@@ -513,6 +513,13 @@ if (aiCommentsPath) {
     // Attach corroboration by INDEX, never by position in the returned array, and
     // bounds-check the index: the same defence the scorer uses. A bad index here
     // would cite the wrong bot comment on a real finding.
+    // Count what was ATTACHED, not what the agent returned. `rec.corroborated.length`
+    // counts an out-of-range index that the bounds check just rejected, so the phase
+    // reported more corroboration than the review actually found, and that number
+    // reaches the operator's final summary. Keying on the index also folds two
+    // corroborations aimed at the SAME finding into the one attachment they produce,
+    // since the second overwrites the first.
+    const corroboratedIndices = new Set()
     for (const c of rec.corroborated || []) {
       if (!c || !Number.isInteger(c.findingIndex)) continue
       if (c.findingIndex < 0 || c.findingIndex >= finalFindings.length) continue
@@ -520,6 +527,7 @@ if (aiCommentsPath) {
         ...finalFindings[c.findingIndex],
         corroborates: { reviewer: c.reviewer, comment_id: c.commentId, url: c.url || '' },
       }
+      corroboratedIndices.add(c.findingIndex)
     }
 
     // A contradiction posts publicly under the user's name. Only concrete ones survive.
@@ -571,7 +579,7 @@ if (aiCommentsPath) {
     }
 
     reconcileSummary = {
-      corroborated: (rec.corroborated || []).length,
+      corroborated: corroboratedIndices.size,
       contradicted: contradictions.length,
       contradictionsDropped: dropped,
       novel: novel.length,

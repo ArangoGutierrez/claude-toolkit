@@ -525,6 +525,12 @@ expect "reconcile-on: counts.survived includes the kept novel claim" \
 # as it did before the phase existed. Same scenario as case 15 minus that one
 # key, and the reconcile stub is left in place on purpose: if the gate ever
 # stops holding, the agent below is sitting there ready to run.
+#
+# The stub map carries a novel claim AND its verify-novel verifier at 85, which
+# the gate means nothing ever reads. They are load-bearing anyway: without them
+# no finding can be added even with the gate wide open, so the counts assertion
+# below could not flip under the one regression it exists to catch, and it would
+# have been green theater. With them, opening the gate moves survived 1 -> 2.
 # ---------------------------------------------------------------------------
 cat > "$TMP/reconcile-skip.json" <<EOF
 {"args": $FARGS,
@@ -537,7 +543,9 @@ cat > "$TMP/reconcile-skip.json" <<EOF
      "reconcile": {
        "corroborated": [{"findingIndex":0,"reviewer":"CodeRabbit","commentId":111,"url":"u111"}],
        "contradicted": [],
-       "novel": []}}}}
+       "novel": [
+         {"reviewer":"CodeRabbit","commentId":333,"url":"u333","file":"src/kept.js","line":5,"description":"unchecked error return","severity":"should-fix"}]},
+     "verify-novel:src/kept.js": {"score":85,"rationale":"confirmed from the diff"}}}}
 EOF
 run reconcile-skip "$FANOUT"
 expect "reconcile-skip: no Reconcile phase is entered" \

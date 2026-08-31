@@ -473,11 +473,12 @@ cat > "$TMP/reconcile-on.json" <<EOF
      "score:bug-scan": {"scores": [{"id":0,"score":95,"rationale":"solid"}]},
      "reconcile": {
        "corroborated": [
-         {"findingIndex":0,"reviewer":"CodeRabbit","commentId":111,"url":"u111"},
-         {"findingIndex":99,"reviewer":"CodeRabbit","commentId":999,"url":"u999"}],
+         {"findingIndex":0,"reviewer":"CodeRabbit","commentId":111,"surface":"inline","url":"u111"},
+         {"findingIndex":99,"reviewer":"CodeRabbit","commentId":999,"surface":"inline","url":"u999"}],
        "contradicted": [
-         {"reviewer":"CodeRabbit","commentId":222,"url":"u222","claim":"says the ctx leaks","refutation":"the defer on line 3 cancels it","concrete":true},
-         {"reviewer":"CodeRabbit","commentId":223,"url":"u223","claim":"says there is a race","refutation":"seems unlikely","concrete":false}],
+         {"reviewer":"CodeRabbit","commentId":222,"surface":"inline","url":"u222","claim":"says the ctx leaks","refutation":"the defer on line 3 cancels it","concrete":true},
+         {"reviewer":"CodeRabbit","commentId":223,"surface":"inline","url":"u223","claim":"says there is a race","refutation":"seems unlikely","concrete":false},
+         {"reviewer":"CodeRabbit","commentId":224,"surface":"issue_comment","url":"u224","claim":"says the walkthrough missed a case","refutation":"the switch on line 9 covers it","concrete":true}],
        "novel": [
          {"reviewer":"CodeRabbit","commentId":333,"url":"u333","file":"src/kept.js","line":5,"description":"unchecked error return","severity":"should-fix"},
          {"reviewer":"CodeRabbit","commentId":334,"url":"u334","file":"src/dropped.js","line":6,"description":"speculative","severity":"consider"}]},
@@ -504,11 +505,25 @@ expect "reconcile-on: the out-of-range index does not stretch the findings list"
 expect "reconcile-on: reconcile.corroborated counts the 1 attached, not the 2 returned" \
   '.return.reconcile.corroborated == 1' reconcile-on
 expect "reconcile-on: the log line agrees with the attached count" \
-  '.logs | index("pr-review-fanout: reconcile matched 1, refuted 1, kept 1 of 2 novel claim(s)") != null' reconcile-on
-expect "reconcile-on: only the concrete contradiction survives" \
-  '(.return.contradictions | type) == "array" and (.return.contradictions | length == 1) and (.return.contradictions[0].commentId == 222)' reconcile-on
+  '.logs | index("pr-review-fanout: reconcile matched 1, refuted 2, kept 1 of 2 novel claim(s)") != null' reconcile-on
+expect "reconcile-on: only the concrete contradictions survive" \
+  '(.return.contradictions | type) == "array" and (.return.contradictions | length == 2) and ([.return.contradictions[].commentId] | sort == [222,224])' reconcile-on
 expect "reconcile-on: the vague contradiction is counted as dropped" \
   '.return.reconcile.contradictionsDropped == 1' reconcile-on
+# The replies route takes a top-level review comment id, which only the `inline`
+# surface produces. Without `surface` on the way out, the private-side builder
+# cannot tell a repliable id from an issue-comment or review id, and the step-9
+# reply loop 404s on two of the three surfaces AFTER the review has posted and
+# can no longer be retracted. These two pin that the field reaches the operator.
+expect "reconcile-on: each surviving contradiction carries the surface its id came from" \
+  '[.return.contradictions[] | select(.commentId == 222) | .surface] == ["inline"] and [.return.contradictions[] | select(.commentId == 224) | .surface] == ["issue_comment"]' reconcile-on
+# Not dropped here: a contradiction on a non-repliable surface still reaches the
+# author through the review body, so the phase must return it rather than filter
+# it. Deleting it here would silence the refutation entirely.
+expect "reconcile-on: a concrete contradiction on a non-repliable surface is kept, not filtered" \
+  '[.return.contradictions[] | select(.surface != "inline")] | length == 1' reconcile-on
+expect "reconcile-on: the attached corroboration carries its surface" \
+  '[.return.findings[] | select(.file == "src/ours.js")][0].corroborates.surface == "inline"' reconcile-on
 expect "reconcile-on: the novel claim scored 85 is kept, with its provenance" \
   '[.return.findings[] | select(.file == "src/kept.js")] | length == 1 and (.[0].category == "ai-reviewer-novel") and (.[0].reviewer == "reconcile") and (.[0].severity == "should-fix")' reconcile-on
 expect "reconcile-on: the kept novel claim cites the bot comment it came from" \

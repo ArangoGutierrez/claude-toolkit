@@ -56,8 +56,19 @@ check "reconcile is gated on aiCommentsPath" "if (aiCommentsPath)"
 # whenever the bounds check above rejects an index.
 check "the corroborated count derives from attachments" "corroborated: corroboratedIndices.size"
 
+# The replies route accepts a top-level review comment id only, which is what the
+# `inline` surface returns. A comment id with no surface beside it cannot be told
+# apart from an issue-comment or review id, so the reply loop 404s after the
+# review has already posted. Both lists carry it: replies may be written for a
+# corroboration as well as for a contradiction.
+check "contradicted records require their surface" \
+  "required: \['reviewer', 'commentId', 'surface', 'claim', 'refutation', 'concrete'\]"
+check "corroborated records require their surface" \
+  "required: \['findingIndex', 'reviewer', 'commentId', 'surface'\]"
+check "the attached corroboration carries the surface through" "surface: c.surface"
+
 if [ "$fails" -gt 0 ]; then
     echo "EVAL $NAME: FAIL - $fails Reconcile invariant(s) broken (see the FAIL lines above)"
     exit 1
 fi
-echo "EVAL $NAME: PASS - all 8 Reconcile invariants hold"
+echo "EVAL $NAME: PASS - all 11 Reconcile invariants hold"

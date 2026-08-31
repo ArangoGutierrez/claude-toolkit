@@ -450,5 +450,133 @@ expect "fanout-score-dupids: the control finding bravo is untouched at 90" \
 expect "fanout-score-dupids: 2 scored, both survive" \
   '.return.counts.raw == 2 and .return.counts.survived == 2' fanout-score-dupids
 
+# ---------------------------------------------------------------------------
+# Case 15: the Reconcile phase. One finding of ours survives scoring, and the
+# reconcile agent returns every shape the phase has to discriminate between:
+# a corroboration on a valid index and one on an index that does not exist, a
+# contradiction with a concrete refutation and one with a vague one, and two
+# novel claims whose independent verifiers score 85 and 50.
+#
+# The counts are the point. `reconcile.corroborated` used to report what the
+# agent RETURNED (2) rather than what was ATTACHED (1), so a rejected index
+# still inflated the number the operator reads in the final summary.
+# ---------------------------------------------------------------------------
+RARGS='{"diffPath":"/tmp/probe.diff","prNumber":7,"ownerRepo":"o/r","repoCheckout":"/tmp/co","domains":[],"claudeMdPaths":["/tmp/CLAUDE.md"],"aiCommentsPath":"/tmp/ai-comments.json"}'
+
+cat > "$TMP/reconcile-on.json" <<EOF
+{"args": $RARGS,
+ "agent": {"default": null,
+   "byLabel": {
+     "review:bug-scan": {"findings": [
+       {"file":"src/ours.js","line":42,"description":"off-by-one","category":"bug","severity":"must-fix","reason":"loop overruns"}],
+      "degraded": false},
+     "score:bug-scan": {"scores": [{"id":0,"score":95,"rationale":"solid"}]},
+     "reconcile": {
+       "corroborated": [
+         {"findingIndex":0,"reviewer":"CodeRabbit","commentId":111,"surface":"inline","url":"u111"},
+         {"findingIndex":99,"reviewer":"CodeRabbit","commentId":999,"surface":"inline","url":"u999"}],
+       "contradicted": [
+         {"reviewer":"CodeRabbit","commentId":222,"surface":"inline","url":"u222","claim":"says the ctx leaks","refutation":"the defer on line 3 cancels it","concrete":true},
+         {"reviewer":"CodeRabbit","commentId":223,"surface":"inline","url":"u223","claim":"says there is a race","refutation":"seems unlikely","concrete":false},
+         {"reviewer":"CodeRabbit","commentId":224,"surface":"issue_comment","url":"u224","claim":"says the walkthrough missed a case","refutation":"the switch on line 9 covers it","concrete":true}],
+       "novel": [
+         {"reviewer":"CodeRabbit","commentId":333,"url":"u333","file":"src/kept.js","line":5,"description":"unchecked error return","severity":"should-fix"},
+         {"reviewer":"CodeRabbit","commentId":334,"url":"u334","file":"src/dropped.js","line":6,"description":"speculative","severity":"consider"}]},
+     "verify-novel:src/kept.js": {"score":85,"rationale":"confirmed from the diff"},
+     "verify-novel:src/dropped.js": {"score":50,"rationale":"could not confirm"}}}}
+EOF
+run reconcile-on "$FANOUT"
+expect "reconcile-on: the Reconcile phase ran" \
+  '.phases | index("Reconcile") != null' reconcile-on
+expect "reconcile-on: exactly one reconcile agent ran" \
+  '[.agents[] | select(. == "reconcile")] | length == 1' reconcile-on
+expect "reconcile-on: our finding carries the corroboration for its own index" \
+  '[.return.findings[] | select(.file == "src/ours.js")][0].corroborates.comment_id == 111' reconcile-on
+# The private-side builder reads snake_case. A camelCase key would deserialize
+# to nothing there and the citation would silently vanish from the posted review.
+expect "reconcile-on: the corroboration key is snake_case comment_id, not commentId" \
+  '[.return.findings[] | select(.file == "src/ours.js")][0].corroborates | (has("comment_id") and (has("commentId") | not))' reconcile-on
+expect "reconcile-on: the out-of-range findingIndex 99 attaches to nothing" \
+  '[.return.findings[] | select(.corroborates.comment_id == 999)] | length == 0' reconcile-on
+expect "reconcile-on: the out-of-range index does not stretch the findings list" \
+  '(.return.findings | type) == "array" and (.return.findings | length == 2)' reconcile-on
+# THE REGRESSION GUARD: the count is what was attached (1), not what the agent
+# returned (2). These two numbers differ only because one index was rejected.
+expect "reconcile-on: reconcile.corroborated counts the 1 attached, not the 2 returned" \
+  '.return.reconcile.corroborated == 1' reconcile-on
+expect "reconcile-on: the log line agrees with the attached count" \
+  '.logs | index("pr-review-fanout: reconcile matched 1, refuted 2, kept 1 of 2 novel claim(s)") != null' reconcile-on
+expect "reconcile-on: only the concrete contradictions survive" \
+  '(.return.contradictions | type) == "array" and (.return.contradictions | length == 2) and ([.return.contradictions[].commentId] | sort == [222,224])' reconcile-on
+expect "reconcile-on: the vague contradiction is counted as dropped" \
+  '.return.reconcile.contradictionsDropped == 1' reconcile-on
+# The replies route takes a top-level review comment id, which only the `inline`
+# surface produces. Without `surface` on the way out, the private-side builder
+# cannot tell a repliable id from an issue-comment or review id, and the step-9
+# reply loop 404s on two of the three surfaces AFTER the review has posted and
+# can no longer be retracted. These two pin that the field reaches the operator.
+expect "reconcile-on: each surviving contradiction carries the surface its id came from" \
+  '[.return.contradictions[] | select(.commentId == 222) | .surface] == ["inline"] and [.return.contradictions[] | select(.commentId == 224) | .surface] == ["issue_comment"]' reconcile-on
+# Not dropped here: a contradiction on a non-repliable surface still reaches the
+# author through the review body, so the phase must return it rather than filter
+# it. Deleting it here would silence the refutation entirely.
+expect "reconcile-on: a concrete contradiction on a non-repliable surface is kept, not filtered" \
+  '[.return.contradictions[] | select(.surface != "inline")] | length == 1' reconcile-on
+expect "reconcile-on: the attached corroboration carries its surface" \
+  '[.return.findings[] | select(.file == "src/ours.js")][0].corroborates.surface == "inline"' reconcile-on
+expect "reconcile-on: the novel claim scored 85 is kept, with its provenance" \
+  '[.return.findings[] | select(.file == "src/kept.js")] | length == 1 and (.[0].category == "ai-reviewer-novel") and (.[0].reviewer == "reconcile") and (.[0].severity == "should-fix")' reconcile-on
+expect "reconcile-on: the kept novel claim cites the bot comment it came from" \
+  '[.return.findings[] | select(.file == "src/kept.js")][0] | (.score == 85) and (.corroborates.comment_id == 333)' reconcile-on
+expect "reconcile-on: the novel claim scored 50 is dropped" \
+  '[.return.findings[] | select(.file == "src/dropped.js")] | length == 0' reconcile-on
+expect "reconcile-on: 2 novel claims seen, 1 kept" \
+  '.return.reconcile.novel == 2 and .return.reconcile.novelKept == 1' reconcile-on
+expect "reconcile-on: counts.survived includes the kept novel claim" \
+  '.return.counts.raw == 1 and .return.counts.survived == 2' reconcile-on
+
+# ---------------------------------------------------------------------------
+# Case 16: the skip contract. Without aiCommentsPath a PR must review EXACTLY
+# as it did before the phase existed. Same scenario as case 15 minus that one
+# key, and the reconcile stub is left in place on purpose: if the gate ever
+# stops holding, the agent below is sitting there ready to run.
+#
+# The stub map carries a novel claim AND its verify-novel verifier at 85, which
+# the gate means nothing ever reads. They are load-bearing anyway: without them
+# no finding can be added even with the gate wide open, so the counts assertion
+# below could not flip under the one regression it exists to catch, and it would
+# have been green theater. With them, opening the gate moves survived 1 -> 2.
+# ---------------------------------------------------------------------------
+cat > "$TMP/reconcile-skip.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {
+     "review:bug-scan": {"findings": [
+       {"file":"src/ours.js","line":42,"description":"off-by-one","category":"bug","severity":"must-fix","reason":"loop overruns"}],
+      "degraded": false},
+     "score:bug-scan": {"scores": [{"id":0,"score":95,"rationale":"solid"}]},
+     "reconcile": {
+       "corroborated": [{"findingIndex":0,"reviewer":"CodeRabbit","commentId":111,"url":"u111"}],
+       "contradicted": [],
+       "novel": [
+         {"reviewer":"CodeRabbit","commentId":333,"url":"u333","file":"src/kept.js","line":5,"description":"unchecked error return","severity":"should-fix"}]},
+     "verify-novel:src/kept.js": {"score":85,"rationale":"confirmed from the diff"}}}}
+EOF
+run reconcile-skip "$FANOUT"
+expect "reconcile-skip: no Reconcile phase is entered" \
+  '[.phases[] | select(. == "Reconcile")] | length == 0' reconcile-skip
+expect "reconcile-skip: no reconcile agent is launched" \
+  '[.agents[] | select(. == "reconcile")] | length == 0' reconcile-skip
+expect "reconcile-skip: the return carries no reconcile key" \
+  '.return | has("reconcile") | not' reconcile-skip
+expect "reconcile-skip: the finding carries no corroboration" \
+  '[.return.findings[] | select(.file == "src/ours.js")][0] | has("corroborates") | not' reconcile-skip
+# Type-checked: jq reads `null | length` as 0, so a bare length check would also
+# pass if the key were absent entirely.
+expect "reconcile-skip: contradictions is present and is an empty array" \
+  '(.return.contradictions | type) == "array" and (.return.contradictions | length == 0)' reconcile-skip
+expect "reconcile-skip: counts are exactly what they were before the phase existed" \
+  '.return.counts.raw == 1 and .return.counts.survived == 1' reconcile-skip
+
 echo "---"; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

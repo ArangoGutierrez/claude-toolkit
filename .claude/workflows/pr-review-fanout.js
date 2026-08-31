@@ -84,6 +84,20 @@ const BATCH_SCORE_SCHEMA = {
 // Reconcile returns a partition, not a rewrite. Our findings are referenced by the
 // index they were handed, never re-emitted, so the phase cannot quietly alter a
 // finding's severity or body on its way through.
+// The ingest reads three surfaces and the comment ids are NOT interchangeable.
+// A threaded reply goes to
+// POST /repos/{o}/{r}/pulls/{n}/comments/{comment_id}/replies, which resolves a
+// top-level review comment id only: that is what `inline` returns. An
+// issue_comment or review id sent there is a 404, and it arrives after the
+// review has posted and can no longer be retracted. Carrying the surface beside
+// the id is what lets the caller route a refutation to a reply or to the review
+// body. Its three values are the ingest's own SURFACES list, copied verbatim.
+const SURFACE_PROPERTY = {
+  type: 'string',
+  enum: ['issue_comment', 'review', 'inline'],
+  description: 'the surface this comment id came from, copied verbatim from the matched record; only `inline` ids can be replied to',
+}
+
 const RECONCILE_SCHEMA = {
   type: 'object',
   required: ['corroborated', 'contradicted', 'novel'],
@@ -92,11 +106,12 @@ const RECONCILE_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['findingIndex', 'reviewer', 'commentId'],
+        required: ['findingIndex', 'reviewer', 'commentId', 'surface'],
         properties: {
           findingIndex: { type: 'integer', description: 'index into the findings list given in the prompt' },
           reviewer: { type: 'string' },
           commentId: { type: 'integer' },
+          surface: SURFACE_PROPERTY,
           url: { type: 'string' },
         },
       },
@@ -105,10 +120,11 @@ const RECONCILE_SCHEMA = {
       type: 'array',
       items: {
         type: 'object',
-        required: ['reviewer', 'commentId', 'claim', 'refutation', 'concrete'],
+        required: ['reviewer', 'commentId', 'surface', 'claim', 'refutation', 'concrete'],
         properties: {
           reviewer: { type: 'string' },
           commentId: { type: 'integer' },
+          surface: SURFACE_PROPERTY,
           url: { type: 'string' },
           claim: { type: 'string', description: "the bot's claim, one sentence" },
           refutation: { type: 'string', description: 'why it is wrong, naming the guard, defer or caller' },
@@ -281,6 +297,8 @@ Read the AI-reviewer records at ${commentsPath} (a JSON array; each record has r
 If that file is missing, is not a JSON array, or is empty, return three empty lists. Do not improvise records, and do not fall back to fetching comments yourself: an unreadable file means the ingest step did not produce one, and inventing input here would put unverified claims into a review.
 
 Records are unique by the PAIR (surface, comment_id), not by comment_id alone: a review id and an inline id can collide. Cite both when you reference one.
+
+Every corroborated and contradicted entry MUST carry BOTH the comment_id AND the surface, copied verbatim from the record you matched. Do not guess a surface, do not normalise it, and do not carry a comment_id from one record with the surface of another. Downstream, the surface decides whether a refutation can be posted as a threaded reply on the bot's comment or has to go in the review body instead, so a wrong surface sends a write to an id that does not exist on that route.
 Read the diff at ${diff}. Repo checkout: ${checkout}.
 
 Our findings, by index:
@@ -525,7 +543,12 @@ if (aiCommentsPath) {
       if (c.findingIndex < 0 || c.findingIndex >= finalFindings.length) continue
       finalFindings[c.findingIndex] = {
         ...finalFindings[c.findingIndex],
-        corroborates: { reviewer: c.reviewer, comment_id: c.commentId, url: c.url || '' },
+        corroborates: {
+          reviewer: c.reviewer,
+          comment_id: c.commentId,
+          surface: c.surface,
+          url: c.url || '',
+        },
       }
       corroboratedIndices.add(c.findingIndex)
     }

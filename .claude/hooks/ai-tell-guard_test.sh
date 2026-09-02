@@ -378,6 +378,55 @@ expect_allow "test36 bash-emoji-not-scanned" "$(bash_payload "echo $EMOJI")"
 expect_allow "test37 bash-env-off" \
     "$(bash_payload 'git commit -m "Co-Authored-By: Claude"')" AI_TELL_GUARD=off
 
+# 38: fenced code blocks are not model prose. Pasted tool output routinely
+# carries em-dashes and glyphs, and scanning it made any report containing
+# evidence effectively unwritable, which pushed agents toward silently
+# rewriting the evidence to satisfy the linter. Fenced content is skipped.
+FENCE='```'
+expect_allow "test38 fenced-emdash-allowed" \
+    "$(write_payload "$F" "intro line\n${FENCE}\nout ${EMDASH} put\n${FENCE}\ntail line")"
+expect_allow "test38 fenced-emoji-allowed" \
+    "$(write_payload "$F" "intro line\n${FENCE}text\n${EMOJI} done\n${FENCE}\ntail line")"
+expect_allow "test38 tilde-fence-allowed" \
+    "$(write_payload "$F" "intro\n~~~\nout ${EMDASH} put\n~~~\ntail")"
+
+# 39: discrimination. Prose OUTSIDE a fence in the very same file must still
+# block, so the skip cannot be mistaken for a whole-file exemption.
+expect_block "test39 prose-outside-fence-still-blocks" \
+    "$(write_payload "$F" "${FENCE}\nsafe ${EMDASH} here\n${FENCE}\nprose ${EMDASH} here")" \
+    "em-dash"
+
+# 40: discrimination. An UNTERMINATED fence must not grant immunity to the rest
+# of the file, otherwise opening a fence and never closing it is a one-line
+# bypass of the entire guard.
+expect_block "test40 unterminated-fence-not-a-bypass" \
+    "$(write_payload "$F" "intro\n${FENCE}\ntool output\n\nprose ${EMDASH} here")" \
+    "em-dash"
+
+# 41: some editors send the ENTIRE new file body in `content` for what is
+# logically a one-line edit, rather than only the replaced span in `new_string`.
+# Scanning all of it re-litigates lines that are already on disk, which test 10
+# rules out for the Edit shape and the module docstring rules out outright. A
+# source file carrying a legacy emoji in a comment otherwise becomes permanently
+# unwritable: nothing the author does to their own added line can clear it.
+# Unchanged lines are not new text, whichever field carried them.
+LEGACY="$TMP/legacy.ts"
+printf '// %s CRITICAL: never log PHI\nexport const a = 1;\n' "$EMOJI" > "$LEGACY"
+expect_allow "test41 unchanged-lines-not-relitigated" \
+    "$(write_payload "$LEGACY" "// $EMOJI CRITICAL: never log PHI\nexport const a = 1;\nexport const b = 2;")"
+
+# 42: discrimination. A tell on a line that is NOT already on disk still blocks,
+# so subtracting the unchanged lines can never read as a whole-file exemption.
+expect_block "test42 added-line-tell-still-blocks" \
+    "$(write_payload "$LEGACY" "// $EMOJI CRITICAL: never log PHI\nexport const a = 1;\nconst c = 3; ${EMDASH} added")" \
+    "em-dash"
+
+# 43: discrimination. A path with nothing on disk has no unchanged lines, so
+# every line of a fresh write is new text and the whole body is still scanned.
+expect_block "test43 fresh-file-still-blocks" \
+    "$(write_payload "$TMP/fresh.ts" "// $EMOJI new file")" \
+    "emoji"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "FAILED ai-tell-guard_test: $FAILED failed assertions across $TOTAL cases"
     exit 1

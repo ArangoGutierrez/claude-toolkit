@@ -2800,6 +2800,7 @@ These skills ship in `.claude/skills/` and deploy to `~/.claude/skills/`. Each h
 
 | Skill | What it does |
 |-------|--------------|
+| [`/cmux-sprint-orchestrator`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/cmux-sprint-orchestrator/README.md) | Orchestrate a sprint across cmux worker panes: a read-only planning phase gated on explicit approval, then bounded dispatch to Codex and Claude workers with per-task verification |
 | [`/done`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/done/SKILL.md) | Close a session by grading the collected evidence against the goal — a NAT-backed evaluator (`skills/done/eval.py`) returning AGREE / DISAGREE / INSUFFICIENT_EVIDENCE, with `DONE_BACKEND` / `DONE_NAT_MODEL` selecting the provider and model. See [Done on OpenRouter](examples/done-openrouter.md) |
 | [`/eureka`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/eureka/README.md) | Capture a breakthrough before it evaporates |
 | [`/go-review`](https://github.com/ArangoGutierrez/claude-toolkit/blob/main/.claude/skills/go-review/README.md) | Systematic Go code review for correctness, concurrency, and performance |

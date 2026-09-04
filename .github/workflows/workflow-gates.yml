@@ -31,6 +31,9 @@ jobs:
       - name: Routing-eval harness
         run: bash .claude/evals/no-sonnet-routing_test.sh
 
+      - name: Phase-coverage eval harness
+        run: bash .claude/evals/workflow-phase-coverage_test.sh
+
       # Heads-up for whoever reads a green run: panel-dissent-health is a
       # PERMANENT SKIP here. It grades a decisions log under $HOME that no
       # runner has. See the panel-tests job below.

@@ -640,6 +640,103 @@ expect "fanout-all-dead-stops: the early return still carries the abort error an
   '.return.error == "pr-review-fanout: all 5 of 5 reviewer agent(s) died; no review ran" and .return.counts.posting == 0 and .return.counts.refuted == 0' fanout-all-dead-stops
 expect "fanout-all-dead-stops: the abort still answers thanks and summary_lead, as empty strings" \
   '.return.thanks == "" and .return.summary_lead == ""' fanout-all-dead-stops
+# ---------------------------------------------------------------------------
+# Case 18: Verify actually DROPS what it refutes, and the counts say so.
+#
+# Every other fanout case stubs the refuter dead or absent, so the drop itself
+# was never exercised: replacing the post-refutation filter with a plain copy
+# left the whole suite green while a finding the pipeline had just proved wrong
+# went on to post as an inline comment on someone's pull request.
+#
+# Two must-fix findings, both clearing the score bar, one refuted and one not.
+# The findings are looked up BY FILE, never by position, so the case cannot
+# inherit the ordering bug it is hunting.
+#
+# The corroboration is the second thing this pins. findingIndex 0 means "the
+# first entry of the list reconcilePrompt was shown", and that list is the
+# POST-refutation one, so it must land on src/kept.js. Disable the drop and
+# index 0 becomes src/refuted.js instead, which is the index hazard the phase
+# order created, caught here from the outside.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-refuted-drop.json" <<EOF
+{"args": $RARGS,
+ "agent": {"default": null,
+   "byLabel": {
+     "review:bug-scan": {"findings": [
+       {"file":"src/refuted.js","line":1,"description":"the refuter kills this one","category":"bug","severity":"must-fix","reason":"ra"},
+       {"file":"src/kept.js","line":2,"description":"the refuter cannot kill this one","category":"bug","severity":"must-fix","reason":"rb"}],
+      "degraded": false},
+     "score:bug-scan": {"scores": [{"id":0,"score":95,"rationale":"s0"},{"id":1,"score":95,"rationale":"s1"}]},
+     "merge:dedupe": {"clusters": []},
+     "verify:src/refuted.js:1": {"refuted": true, "reason": "the guard three lines up covers it"},
+     "verify:src/kept.js:2": {"refuted": false, "reason": "the caller reaches it with nil"},
+     "reconcile": {"corroborated": [{"findingIndex":0,"reviewer":"CodeRabbit","commentId":111,"surface":"inline","url":"u111"}],
+                   "contradicted": [], "novel": []},
+     "summarize:body": {"thanks": "Thanks for tightening the retry path.",
+                        "summary_lead": "One finding did not survive refutation."}}}}
+EOF
+run fanout-refuted-drop "$FANOUT"
+expect "fanout-refuted-drop: the refuted finding does not post" \
+  '[.return.findings[] | select(.file == "src/refuted.js")] | length == 0' fanout-refuted-drop
+expect "fanout-refuted-drop: exactly one finding posts, and it is the one the refuter kept" \
+  '(.return.findings | length == 1) and ([.return.findings[] | select(.file == "src/kept.js")] | length == 1)' fanout-refuted-drop
+# All four numbers, because they only mean anything against each other: raw
+# drops to survived by score, survived drops by refuted, posting is what the
+# caller puts on the pull request. Hardcoding refuted to 0 passes every other
+# case in this file.
+expect "fanout-refuted-drop: counts separate what survived scoring from what posts" \
+  '.return.counts.raw == 2 and .return.counts.survived == 2 and .return.counts.refuted == 1 and .return.counts.posting == 1' fanout-refuted-drop
+expect "fanout-refuted-drop: the refutation reaches the log with its count" \
+  '.logs | index("pr-review-fanout: verify refuted 1 of 2 inline finding(s)") != null' fanout-refuted-drop
+expect "fanout-refuted-drop: corroboration index 0 lands on the post-refutation list, not on the dropped finding" \
+  '[.return.findings[] | select(.file == "src/kept.js")][0].corroborates.comment_id == 111' fanout-refuted-drop
+# Summarize launches in several cases above; nothing read what it produced, so
+# returning a constant empty string for both fields stayed green. An empty
+# thanks is what the caller treats as a dead summarizer, and it approves a clean
+# pull request on that line.
+expect "fanout-refuted-drop: the Summarize output reaches out.thanks verbatim" \
+  '.return.thanks == "Thanks for tightening the retry path."' fanout-refuted-drop
+expect "fanout-refuted-drop: the Summarize output reaches out.summary_lead verbatim" \
+  '.return.summary_lead == "One finding did not survive refutation."' fanout-refuted-drop
+
+# ---------------------------------------------------------------------------
+# Case 19: a returned cluster actually STAMPS root_cause onto the findings it
+# names, and onto nothing else. Merge launching was pinned by the agent count
+# in case 9; its effect was not, so deleting the assignment inside applyClusters
+# left the suite green and the payload builder went on folding nothing.
+#
+# Three findings, a cluster over the first two. src/solo.js is the control: a
+# mutant that stamps every finding rather than the named ones fails on it.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-merge-cluster.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {
+     "review:bug-scan": {"findings": [
+       {"file":"src/dup-a.js","line":1,"description":"missing nil guard","category":"bug","severity":"must-fix","reason":"r0"},
+       {"file":"src/dup-b.js","line":2,"description":"the same missing nil guard, said differently","category":"bug","severity":"must-fix","reason":"r1"},
+       {"file":"src/solo.js","line":3,"description":"an unrelated off-by-one","category":"bug","severity":"must-fix","reason":"r2"}],
+      "degraded": false},
+     "merge:dedupe": {"clusters": [{"ids": [0, 1], "root_cause": "shared-nil-guard"}]},
+     "summarize:body": {"thanks": "Thanks for this.", "summary_lead": ""}},
+   "byLabelPrefix": {
+     "score:": {"scores": [{"id":0,"score":95,"rationale":"a"},{"id":1,"score":95,"rationale":"b"},{"id":2,"score":95,"rationale":"c"}]},
+     "verify:": {"refuted": false, "reason": "the path reaches all three"}}}}
+EOF
+run fanout-merge-cluster "$FANOUT"
+expect "fanout-merge-cluster: the first clustered finding carries the root_cause the agent named" \
+  '[.return.findings[] | select(.file == "src/dup-a.js")][0].root_cause == "shared-nil-guard"' fanout-merge-cluster
+expect "fanout-merge-cluster: so does its sibling" \
+  '[.return.findings[] | select(.file == "src/dup-b.js")][0].root_cause == "shared-nil-guard"' fanout-merge-cluster
+# The control. Stamping every finding would fold three separate defects into one
+# comment on a real review, which is worse than posting the near-duplicate.
+expect "fanout-merge-cluster: the finding outside the cluster carries no root_cause at all" \
+  '[.return.findings[] | select(.file == "src/solo.js")][0] | has("root_cause") | not' fanout-merge-cluster
+# Merge annotates, it never removes: the builder does the folding downstream.
+expect "fanout-merge-cluster: clustering drops nothing from the posted list" \
+  '(.return.findings | length) == 3 and .return.counts.posting == 3' fanout-merge-cluster
+expect "fanout-merge-cluster: the fold count reaches the log" \
+  '.logs | index("pr-review-fanout: merge folded 1 duplicate finding(s) into siblings") != null' fanout-merge-cluster
 
 echo "---"; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

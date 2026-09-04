@@ -5,7 +5,10 @@ export const meta = {
   phases: [
     { title: 'Review' },
     { title: 'Score' },
+    { title: 'Merge' },
+    { title: 'Verify' },
     { title: 'Reconcile' },
+    { title: 'Summarize' },
   ],
 }
 
@@ -35,6 +38,54 @@ const RUBRIC = `- 0: Not confident. False positive under light scrutiny, or pre-
 - 50: Moderately. Verified real, but a nitpick or rare in practice; not very important.
 - 75: Highly. Double-checked; likely hit in practice; current approach insufficient; or directly named in the relevant CLAUDE.md.
 - 100: Certain. Confirmed definitely real and frequent; evidence directly confirms it.`
+
+// A reviewer's `description` becomes the posted comment body VERBATIM. The
+// build-time gate in build_review_payload.py raises on a violation, which fails
+// the whole review late; saying it here is what gets it written right at source.
+const TONE_CONTRACT = `Write each description the way a senior engineer writes a review comment:
+- One or two sentences. State what breaks, then what to do about it.
+- Name the symbol, invariant or test involved. Specifics are what make a comment worth reading.
+- No severity tag in the text. Bracketed tags are linter-report format; the severity field carries it.
+- No emoji. No filler adjectives. No em dashes. Use a comma, a colon or parentheses.
+- Never narrate the review itself. "I checked X", "X holds up" and "nothing blocks merge" describe your own
+  pass over the diff; the author gets nothing from them. Write about the change, never about reviewing it.
+- Do not cite (file:line) in the description. The file and line fields already carry it.`
+
+const VERDICT_SCHEMA = {
+  type: 'object',
+  required: ['refuted', 'reason'],
+  properties: {
+    refuted: { type: 'boolean' },
+    reason: { type: 'string', description: 'one line: why it is wrong, or the path that reaches it' },
+  },
+}
+
+const MERGE_SCHEMA = {
+  type: 'object',
+  required: ['clusters'],
+  properties: {
+    clusters: {
+      type: 'array',
+      items: {
+        type: 'object',
+        required: ['ids', 'root_cause'],
+        properties: {
+          ids: { type: 'array', items: { type: 'integer' }, description: 'two or more finding ids' },
+          root_cause: { type: 'string', description: 'short kebab-case name for the shared defect' },
+        },
+      },
+    },
+  },
+}
+
+const SUMMARY_SCHEMA = {
+  type: 'object',
+  required: ['thanks', 'summary_lead'],
+  properties: {
+    thanks: { type: 'string', description: 'one short warm sentence; required unless a finding is must-fix' },
+    summary_lead: { type: 'string', description: 'one or two sentences framing the change' },
+  },
+}
 
 const FINDINGS_SCHEMA = {
   type: 'object',
@@ -212,6 +263,7 @@ const reviewerFooter =
   'Report only defects you can anchor to a specific changed file and NEW-file (RIGHT-side) line; ' +
   'return an empty findings array when nothing real is wrong; never invent findings.\n\n' +
   'Set the top-level "degraded" field to false unless a checklist file you were instructed to read is missing (then set it true).\n\n' +
+  TONE_CONTRACT + '\n\n' +
   GUARDRAILS + '\n\n' +
   NO_POST_CLAUSE
 
@@ -452,7 +504,9 @@ const results = await pipeline(
     const findings = review.findings
     return agent(
       batchScorePrompt(findings, r.name),
-      { label: `score:${r.name}`, phase: 'Score', schema: BATCH_SCORE_SCHEMA, model: 'haiku' },
+      // opus, not haiku: rules/CLAUDE.md routes ALL critic and review gates to
+      // opus, and this gate decides which findings reach a colleague's PR.
+      { label: `score:${r.name}`, phase: 'Score', schema: BATCH_SCORE_SCHEMA, model: 'opus' },
     // SCOPE: this catch covers a throw from the agent() call ABOVE it and nothing
     // else. A throw inside the .then body below is NOT covered — it propagates to
     // pipeline, drops this whole item, and loses the reviewer's findings SILENTLY.
@@ -506,22 +560,134 @@ const scored = (results || []).filter(Boolean).flat().filter(Boolean)
 const survivors = scored.filter((f) => typeof f.score === 'number' && f.score >= 80)
 const rankOf = (s) => (s === 'must-fix' ? 0 : s === 'should-fix' ? 1 : s === 'consider' ? 2 : 3)
 
-log(
-  `pr-review-fanout: scored ${scored.length} finding(s), ${survivors.length} survived (score >= 80)` +
-  (degradedReviewers.length ? `; degraded reviewers: ${degradedReviewers.join(', ')}` : ''),
-)
+log(`pr-review-fanout: scored ${scored.length} finding(s), ${survivors.length} survived (score >= 80)`)
 
+// ---- Merge: one defect, one comment ---------------------------------------
+// Five generic reviewers and up to six specialists read the SAME diff, so one
+// defect arrives several times under different wording and posts as several
+// comments. build_review_payload.py can already fold findings that share a
+// `root_cause` into one comment, but nothing ever computed one, so the folding
+// never fired on a real review. This phase computes it.
+//
+// A genuine barrier: clustering is the one question here that cannot be
+// answered per-finding, because it is about the relationship between them.
+const mergePrompt = (findings) =>
+  'Independent reviewers each read the same pull request diff, so the same defect can appear more than once ' +
+  'below under different wording. Group the findings that describe THE SAME underlying defect.\n\n' +
+  'Group two findings only when one edit would fix both. Sharing a file, a line range or a category is NOT ' +
+  'enough on its own. When you are unsure, leave them separate: merging two distinct defects hides one of ' +
+  'them, which is worse than posting a near-duplicate comment.\n\n' +
+  findings.map((f, i) =>
+    `[id ${i}] ${f.file}:${f.line} (${f.severity}, from ${f.reviewer})\n  ${f.description}`).join('\n\n') +
+  '\n\nReturn one cluster per group of TWO OR MORE ids, each with a short kebab-case root_cause naming the ' +
+  'shared defect. Return no cluster at all for a finding that has no duplicate; never return a single-id ' +
+  'cluster.\n\n' +
+  NO_POST_CLAUSE
+
+// Plain code, not an agent: bounds-check the ids the model returned and refuse
+// to put one finding in two clusters. A cluster of one is dropped rather than
+// stamped, because the builder treats an absent root_cause as "unrelated" and a
+// one-member group would otherwise fold nothing while looking like it did.
+const applyClusters = (findings, result) => {
+  const groups = (result && Array.isArray(result.clusters)) ? result.clusters : []
+  const assigned = new Set()
+  let folded = 0
+  for (const g of groups) {
+    if (!g || !Array.isArray(g.ids) || !g.root_cause) continue
+    const ids = g.ids.filter((i) =>
+      Number.isInteger(i) && i >= 0 && i < findings.length && !assigned.has(i))
+    if (ids.length < 2) continue
+    for (const i of ids) {
+      assigned.add(i)
+      findings[i].root_cause = String(g.root_cause)
+    }
+    folded += ids.length - 1
+  }
+  return folded
+}
+
+if (survivors.length > 1) {
+  const clusters = await agent(
+    mergePrompt(survivors),
+    { label: 'merge:dedupe', phase: 'Merge', schema: MERGE_SCHEMA, model: 'opus' },
+  )
+  if (!clusters) {
+    degradedReviewers.push('merge (agent returned no result; duplicates may post twice)')
+  } else {
+    const folded = applyClusters(survivors, clusters)
+    log(`pr-review-fanout: merge folded ${folded} duplicate finding(s) into siblings`)
+  }
+}
+
+// ---- Verify: argue the other side before it reaches an author -------------
+// The scorer rates confidence in a finding; it never argues against it. Since
+// a must-fix now decides the review event, a false one both posts a wrong
+// demand AND withholds an approval, so it costs twice what it used to.
+const refutePrompt = (f) =>
+  'REFUTE the pull request review finding below. Your job is to find the reason it is WRONG, not to confirm ' +
+  'it: the guard that already exists further up, the caller that cannot reach this state, the invariant that ' +
+  'makes it safe, the type that rules it out, or the fact that it describes behaviour the PR did not change.' +
+  `\n\nFinding: ${f.file}:${f.line} (${f.severity}, from ${f.reviewer})\n${f.description}\n` +
+  `Reason it was flagged: ${f.reason}\n\n` +
+  `The diff is at ${diffPath} and the repository is checked out at ${repoCheckout}. Read the surrounding ` +
+  'code, not only the diff hunk: most false findings die on context the hunk does not show.\n\n' +
+  'Set refuted=true when the finding is wrong, when it describes pre-existing behaviour, or when you cannot ' +
+  'demonstrate a concrete path that reaches the defect. Set refuted=false ONLY when you can name that path. ' +
+  'Default to refuted=true when the evidence is ambiguous: a wrong comment on a colleague\'s pull request ' +
+  'costs more than a missed nitpick.\n\n' +
+  NO_POST_CLAUSE
+
+// Only findings that would post as an inline comment are worth a refuter. A
+// `consider` note is not a demand, so paying an agent to attack it buys little.
+const INLINE_SEVERITIES = new Set(['must-fix', 'should-fix'])
+const toVerify = survivors.filter((f) => INLINE_SEVERITIES.has(f.severity))
+let refutedCount = 0
+if (toVerify.length) {
+  const verdicts = await parallel(toVerify.map((f) => () =>
+    agent(refutePrompt(f), {
+      label: `verify:${f.file}:${f.line}`, phase: 'Verify', schema: VERDICT_SCHEMA, model: 'opus',
+    }).then((v) => ({ f, v }))))
+  for (const entry of verdicts) {
+    if (!entry) continue
+    const { f, v } = entry
+    // A dead refuter keeps the finding. Fail-open is deliberate: an agent that
+    // died proves nothing about the finding, and silently deleting real
+    // findings on infrastructure failure is the worse of the two errors. The
+    // human confirm step is still downstream of this.
+    if (!v) {
+      degradedReviewers.push(`verify:${f.file}:${f.line} (refuter returned no result; finding kept unverified)`)
+      continue
+    }
+    if (v.refuted === true) {
+      f.refuted = true
+      f.refutedReason = v.reason || ''
+      refutedCount++
+    }
+  }
+}
+// The post-refutation list. It is the array Reconcile indexes into AND the array
+// reconcilePrompt is handed, so the index the agent is shown is the index written
+// back; handing Reconcile `survivors` instead would attach a corroboration to a
+// finding Verify had already dropped.
+const finalFindings = survivors.filter((f) => f.refuted !== true)
+if (refutedCount) {
+  log(`pr-review-fanout: verify refuted ${refutedCount} of ${toVerify.length} inline finding(s)`)
+}
+
+// ---- Reconcile: our findings against the bots already on the PR -----------
+// After Verify on purpose: a corroboration can then never be attached to a
+// finding the refuter is about to drop. Before Summarize on purpose too, so
+// `hasBlocker` below is computed over the final set, novel must-fix included.
 let reconcileSummary = null
 let contradictions = []
-const finalFindings = survivors.slice()
 
-// No `survivors.length > 0` condition, deliberately: Reconcile must run even when
-// we found nothing, because a bot may have found something we did not. Gating on
-// our own findings would reintroduce the coverage gap this phase exists to close.
+// No `finalFindings.length > 0` condition, deliberately: Reconcile must run even
+// when we found nothing, because a bot may have found something we did not. Gating
+// on our own findings would reintroduce the coverage gap this phase exists to close.
 if (aiCommentsPath) {
   phase('Reconcile')
   const rec = await agent(
-    reconcilePrompt(survivors, aiCommentsPath, diffPath, repoCheckout),
+    reconcilePrompt(finalFindings, aiCommentsPath, diffPath, repoCheckout),
     { label: 'reconcile', phase: 'Reconcile', schema: RECONCILE_SCHEMA, model: 'opus' },
   )
 
@@ -614,11 +780,56 @@ if (aiCommentsPath) {
 
 finalFindings.sort((a, b) => rankOf(a.severity) - rankOf(b.severity))
 
+// ---- Summarize: the body an author actually reads first -------------------
+// Left to the calling model, these two fields were improvised from the finding
+// list alone, which is how a body ends up being an index of the comments beside
+// it. One agent that has read the diff writes them instead.
+const hasBlocker = finalFindings.some((f) => f.severity === 'must-fix')
+const summaryPrompt =
+  'Write the two prose fields that open a pull request review body. Both are posted VERBATIM under a human ' +
+  `reviewer's own name on a public pull request.\n\n` +
+  `Read the diff at ${diffPath} first, and say something specific and true about what this change does.\n\n` +
+  '"thanks": one short, warm, human sentence thanking the author and naming what the change improves. ' +
+  (hasBlocker
+    ? 'This review carries a blocking finding, so it will NOT be posted as an approval. Keep this field short ' +
+      'or return an empty string.'
+    : 'This review WILL be posted as an approval, so this field is REQUIRED and must not be empty. Something ' +
+      'like "Thanks for this, the retry rework removes a real source of flakiness."') + '\n\n' +
+  '"summary_lead": one or two sentences framing the change, and what is left to do if anything. Return an ' +
+  'empty string when the thanks line already says everything worth saying.\n\n' +
+  'Never count your own output ("Found 3 issues") and never restate the findings: each already has its own ' +
+  'comment on its own line, and repeating them here doubles the apparent weight of the review.\n\n' +
+  TONE_CONTRACT + '\n\n' +
+  'Findings that will accompany this body:\n' +
+  (finalFindings.length
+    ? finalFindings.map((f) => `- ${f.file}:${f.line} (${f.severity}) ${f.description}`).join('\n')
+    : '(none: nothing survived review)') + '\n\n' +
+  NO_POST_CLAUSE
+
+const summary = await agent(summaryPrompt, {
+  label: 'summarize:body', phase: 'Summarize', schema: SUMMARY_SCHEMA, model: 'opus',
+})
+if (!summary) {
+  degradedReviewers.push('summarize (agent returned no result; write thanks and summary_lead by hand)')
+}
+
+log(
+  `pr-review-fanout: ${finalFindings.length} finding(s) to post` +
+  (degradedReviewers.length ? `; degraded: ${degradedReviewers.join(', ')}` : ''),
+)
+
 const out = {
   findings: finalFindings,
   contradictions,
+  thanks: (summary && summary.thanks) || '',
+  summary_lead: (summary && summary.summary_lead) || '',
   degradedReviewers,
-  counts: { raw: scored.length, survived: finalFindings.length },
+  counts: {
+    raw: scored.length,
+    survived: survivors.length,
+    refuted: refutedCount,
+    posting: finalFindings.length,
+  },
 }
 if (reconcileSummary) out.reconcile = reconcileSummary
 // `reviewers.length > 0` is DEFENSIVE ONLY — it cannot be false today.

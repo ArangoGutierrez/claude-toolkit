@@ -562,6 +562,35 @@ const rankOf = (s) => (s === 'must-fix' ? 0 : s === 'should-fix' ? 1 : s === 'co
 
 log(`pr-review-fanout: scored ${scored.length} finding(s), ${survivors.length} survived (score >= 80)`)
 
+// Abort here, before Merge, Verify, Reconcile and Summarize. This check used to sit
+// at the bottom of the file and only decorate an already-built `out`, so a run where
+// every reviewer died still paid for a merge, a refuter per surviving finding, a
+// reconcile pass and a summarizer, and `summarize:body` wrote the approval line for a
+// PR no reviewer ever read. The object below carries the same fields that path
+// returned, so a caller reading `findings`, `thanks` or `counts` sees no difference.
+//
+// `reviewers.length > 0` is DEFENSIVE ONLY: it cannot be false today.
+// genericReviewers is a literal of 5 entries and specialists only add to it, so
+// `reviewers` always has at least 5 members here. Keep the check so a future
+// path that legitimately runs zero reviewers cannot report "all 0 of 0 reviewer
+// agent(s) died", but do not read it as reachable today.
+if (reviewers.length > 0 && liveReviewers === 0) {
+  const deadReviewerCount = reviewers.length - liveReviewers
+  const abortError = `pr-review-fanout: all ${deadReviewerCount} of ${reviewers.length} reviewer agent(s) died; no review ran`
+  log(abortError)
+  return {
+    findings: [],
+    contradictions: [],
+    thanks: '',
+    summary_lead: '',
+    degradedReviewers,
+    counts: { raw: scored.length, survived: survivors.length, refuted: 0, posting: 0 },
+    error: abortError,
+    deadReviewerCount,
+    attemptedReviewerCount: reviewers.length,
+  }
+}
+
 // ---- Merge: one defect, one comment ---------------------------------------
 // Five generic reviewers and up to six specialists read the SAME diff, so one
 // defect arrives several times under different wording and posts as several
@@ -832,16 +861,4 @@ const out = {
   },
 }
 if (reconcileSummary) out.reconcile = reconcileSummary
-// `reviewers.length > 0` is DEFENSIVE ONLY — it cannot be false today.
-// genericReviewers is a literal of 5 entries and specialists only add to it, so
-// `reviewers` always has at least 5 members here. Keep the check so a future
-// path that legitimately runs zero reviewers cannot report "all 0 of 0 reviewer
-// agent(s) died", but do not read it as reachable today.
-if (reviewers.length > 0 && liveReviewers === 0) {
-  const deadReviewerCount = reviewers.length - liveReviewers
-  out.error = `pr-review-fanout: all ${deadReviewerCount} of ${reviewers.length} reviewer agent(s) died; no review ran`
-  out.deadReviewerCount = deadReviewerCount
-  out.attemptedReviewerCount = reviewers.length
-  log(out.error)
-}
 return out

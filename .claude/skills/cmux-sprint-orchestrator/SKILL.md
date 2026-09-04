@@ -137,7 +137,34 @@ Identify high-risk integration zones explicitly: files imported by three or more
 anything in an auth or crypto path, and any file two planned tasks would both touch. The last
 category is the one that decides your DAG edges.
 
-### 1.2 Decide whether to fan out at all
+### 1.2 Confirm the target repo is dispatch-ready
+
+A dispatched worker runs inside **your** hook stack, not a clean one. Hooks you wrote for
+your own repositories will fire against the target repo, and when one blocks a worker the
+orchestrator sees nothing but a stall: no error, no signal, just a timeout.
+
+Observed on the first live run of this skill. A worker created its own worktree, ran the
+baseline suite green, wrote correct tests, and every write was then refused by a PreToolUse
+hook demanding a linked worktree. Three dispatches burned about five minutes each and the
+root surface could not tell that from a slow worker. Adding the marker the hook asked for
+made the same brief succeed unchanged.
+
+Before dispatching anything, check what your own hooks require of a repo:
+
+```bash
+ls "$REPO"/{AGENTS.md,CLAUDE.md} 2>/dev/null      # project instruction files the hooks read
+grep -rl 'PreToolUse' ~/.claude/settings*.json 2>/dev/null
+```
+
+Then satisfy the requirement in the target repo, or hand each worker a properly linked
+worktree. Either is fine; discovering which one your hooks want after three silent stalls is
+not. A worker blocked by a policy hook has not failed the task, and re-briefing it will not
+help, so this belongs in Phase 1 rather than in the failure policy.
+
+Clean up after a blocked worker: it may have created a git worktree of its own before being
+stopped. `git -C "$REPO" worktree list` shows them and they outlive the surface you closed.
+
+### 1.3 Decide whether to fan out at all
 
 Do this before writing the DAG, and be willing to answer no. Three independent agents given a
 three-item sprint all reached the same conclusion unprompted: two of the items rewrote the same
@@ -159,7 +186,7 @@ first, freeze it, then fan out the test sweep across the settled API.
 An orchestrator that dispatches three workers onto one file has not parallelized the sprint,
 it has scheduled a merge conflict.
 
-### 1.3 Write SPRINT_PLAN.md
+### 1.4 Write SPRINT_PLAN.md
 
 Write it to the repo root. It has exactly these four sections, with these headings:
 
@@ -219,7 +246,7 @@ The cheap proof is to run the command against the current tree and confirm it re
 positive it is supposed to find. A pattern that matches nothing today will also match nothing
 after a worker breaks the thing it guards, and you will read that silence as success.
 
-### 1.4 The execution gate
+### 1.5 The execution gate
 
 Print a summary of the plan: objective count, task count, the concurrency-eligible set, and
 the verification commands. Then stop and ask, with `AskUserQuestion`, whether to execute.
@@ -241,7 +268,7 @@ variants of these commands do not exist.
 | Need | Command | Behaviour |
 |---|---|---|
 | Create worker | `cmux new-split right --focus false` | prints `OK surface:11 workspace:1` as **plain text**. There is no `--json` flag. |
-| Capture its id | `... \| awk '{print $2}'` | yields `surface:11` |
+| Capture its id | `... \| cut -d' ' -f2` | yields `surface:11` |
 | Send a command | `cmux send --surface "$S" "$CMD"'\n'` | the trailing `\n` is interpreted by cmux and submits the line |
 | Send a bare key | `cmux send-key --surface "$S" enter` | use when a TUI swallowed the newline |
 | Read the pane | `cmux read-screen --surface "$S" --lines 50` | add `--scrollback` for history |
@@ -283,13 +310,27 @@ orchestrator (`/tmp/claude-NNN/...`) than for the unsandboxed worker shell
 (`/var/folders/.../T/...`), so a brief written to one is missing in the other.
 
 Every brief states: the task id, the exact paths the worker may touch, the paths it must not,
-the invariants from section 2, the done-when condition from the DAG, and this last line:
+the invariants from section 2, the done-when condition from the DAG, a clause waiving the
+worker's own approval reflex, and this last line:
 
 ```
+You are running non-interactively. Nobody can answer a question, and asking one ends
+your turn with the task untouched. The approval gate for this sprint already happened
+at the plan level, so you have authority to implement this brief. Where the brief
+leaves a design choice open, make it, record it in a docstring or comment, and carry
+on. Do not ask for confirmation.
+
 LAST ACTION: run `cmux wait-for -S <TOKEN>` to signal completion.
 ```
 
-Without that signal the orchestrator has nothing to block on and degrades to screen-scraping.
+The waiver is not boilerplate. A dispatched worker inherits the operator's own engineering
+standards, and those usually say "brainstorm and get the design approved before implementing".
+That is right for interactive work and fatal here. Observed twice on one task: the worker
+proposed a sensible design, asked "Do you approve this design?", and exited **rc=0** having
+written nothing, in 57 and 69 seconds. Both runs looked like clean successes from the outside.
+
+Without the signal line the orchestrator has nothing to block on and degrades to
+screen-scraping.
 
 ### Worker routing matrix
 
@@ -303,26 +344,31 @@ worker has to make a design call, send it to Opus.
 
 ### Dispatch
 
+The dispatch itself lives in `scripts/dispatch-worker.sh` beside this file, not inline
+here, and that placement is deliberate. See the warning below.
+
 ```bash
-#!/bin/bash
-# dispatch_worker <agent: sol|opus> <task-id> <brief-path>
-dispatch_worker() {
-  local agent="$1" task="$2" brief="$3"
-  local tok="sprint-${task}"
-  local s cmd
-  s=$(cmux new-split right --focus false | awk '{print $2}')
-  [ -n "$s" ] || { echo "FATAL: no surface captured for $task"; return 1; }
-
-  case "$agent" in
-    sol)  cmd="codex exec -m gpt-5.6-sol --skip-git-repo-check - < $brief" ;;
-    opus) cmd="claude --model opus --effort xhigh --permission-mode auto --dangerously-skip-permissions -p \"\$(cat $brief)\" < /dev/null" ;;
-    *)    echo "unknown agent: $agent"; return 1 ;;
-  esac
-
-  cmux send --surface "$s" "cd $REPO && $cmd; cmux wait-for -S $tok"'\n'
-  echo "$task $agent $s $tok"      # append to the dispatch ledger
-}
+# dispatch-worker.sh <sol|opus> <task-id> <brief-path> <repo>
+# prints "<task> <agent> <surface> <token>" for your dispatch ledger
+SKILL_DIR="$HOME/.claude/skills/cmux-sprint-orchestrator"
+"$SKILL_DIR/scripts/dispatch-worker.sh" sol  T1 "$REPO/.sprint/briefs/T1.md" "$REPO"
+"$SKILL_DIR/scripts/dispatch-worker.sh" opus T2 "$REPO/.sprint/briefs/T2.md" "$REPO"
 ```
+
+**Never write a shell positional or an awk field reference into this file** (a dollar sign
+followed by a digit). When the skill is invoked with arguments, the loader replaces every one
+of them in the SKILL.md body with a word from those arguments before the agent reads it.
+Observed here: the awk print-second-field idiom was delivered with a path from the invocation
+in place of the field reference, so it captured no surface id, and the next
+`cmux send --surface ""` targeted the wrong pane. That is the single most dangerous failure
+in this whole document, and the loader causes it.
+
+This is why the capture idiom above is `cut -d' ' -f2` rather than awk, why the agent-state
+row is read with `cut -f4,6,7` rather than a field comparison, and why the dispatch function
+sits in `scripts/dispatch-worker.sh`. A referenced file is read from disk and is never
+rewritten. Keep it that way: if you move that script's body back inline, it breaks silently
+and only when someone passes arguments.
+
 
 The `< /dev/null` on the Claude worker is not optional. Without it `claude -p` waits three
 seconds for stdin that a PTY never sends, then prints `Warning: no stdin data received in 3s`
@@ -344,6 +390,19 @@ effort, and permission flags only. The combined
 Block on the token rather than polling text. `wait-for` returns rc=0 the moment the worker
 signals, and rc=1 at the timeout, which is your stall detector.
 
+**The token proves the worker's process ended. It does not prove the task succeeded.** The
+signal is the next command in the worker's shell chain, so it fires just as reliably when the
+agent refused, errored, or asked a question and quit. `dispatch-worker.sh` therefore also
+records the worker's exit status to `.sprint/status/<task>.rc`, but even that is not enough:
+in the observed failure the worker exited **0** having written nothing. Only the task's own
+done-when condition, re-run by you at the root, separates finished from succeeded:
+
+```bash
+grep -c 'def slugify' src/strings.py      # the done-when from the DAG row, run by YOU
+```
+
+Treat a worker's report the way you would treat any unverified claim.
+
 ```bash
 if cmux wait-for "$TOK" --timeout 900; then
   echo "$TASK signalled"
@@ -356,7 +415,7 @@ fi
 Between waves, or when a wait times out, read agent state:
 
 ```bash
-cmux top --all --format tsv | awk -F'\t' '$4=="tag" {printf "%s -> %s\n", $6, $7}'
+cmux top --all --format tsv | cut -f4,6,7 | grep '^tag'
 ```
 
 `Needs input` means the worker is blocked on a prompt, not working. That is a stall: read the
@@ -435,7 +494,7 @@ pasted verification output, and every deviation from `SPRINT_PLAN.md` with its r
 
 | Mistake | Consequence | Fix |
 |---|---|---|
-| `cmux new-split right --json \| jq -r '.surface_id'` | empty `SURFACE_ID`; the next `cmux send` with an empty `--surface` targets the wrong pane | `--json` does not exist; `awk '{print $2}'` the plain-text `OK` line |
+| `cmux new-split right --json \| jq -r '.surface_id'` | empty `SURFACE_ID`; the next `cmux send` with an empty `--surface` targets the wrong pane | `--json` does not exist; `cut -d' ' -f2` the plain-text `OK` line |
 | `codex run --model X --prompt '...'` | no such subcommand, no such flag | `codex exec -m X - < brief` |
 | Parsing the id out of `close-surface` output | you believe a surface closed that is still running | confirm with `cmux tree` |
 | Nesting the brief in quotes inside the send payload | truncated brief on any apostrophe; the worker builds the wrong thing | brief file plus stdin redirect |

@@ -544,10 +544,16 @@ command cp -f /tmp/db.bak src/store/db.py
 Collect each task branch before you verify the whole. The worker leaves its output
 uncommitted in its own worktree, so the root commits it on the task branch and merges:
 
+Workers differ in whether they commit. Opus workers committed their own output, in RED then
+GREEN pairs; Codex workers left it uncommitted in the worktree. Collection must tolerate both
+or it fails on whichever kind you did not expect:
+
 ```bash
 W="$REPO/.sprint/worktrees/$TASK"
-git -C "$W" add -A
-git -C "$W" commit -m "feat(scope): $TASK"
+if [ -n "$(git -C "$W" status --porcelain)" ]; then
+  git -C "$W" add -A
+  git -C "$W" commit -m "feat(scope): $TASK"
+fi
 git -C "$REPO" merge --no-ff --no-edit "sprint/$TASK"
 git -C "$REPO" worktree remove "$W" --force && git -C "$REPO" branch -d "sprint/$TASK"
 ```

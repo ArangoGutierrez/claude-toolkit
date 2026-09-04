@@ -319,9 +319,14 @@ your turn with the task untouched. The approval gate for this sprint already hap
 at the plan level, so you have authority to implement this brief. Where the brief
 leaves a design choice open, make it, record it in a docstring or comment, and carry
 on. Do not ask for confirmation.
-
-LAST ACTION: run `cmux wait-for -S <TOKEN>` to signal completion.
 ```
+
+**Do not ask the worker to signal.** The dispatcher appends the signal to the worker's shell
+chain, after the process exits and after its exit status is recorded. A brief that also tells
+the worker to run the signal itself makes the token fire from inside a session that is still
+finishing: observed here, the wait returned while the worker was still printing its diff, and
+the exit-status file did not exist yet. One signal, owned by the chain, and the token then
+means exactly "the worker process ended".
 
 The waiver is not boilerplate. A dispatched worker inherits the operator's own engineering
 standards, and those usually say "brainstorm and get the design approved before implementing".
@@ -329,8 +334,30 @@ That is right for interactive work and fatal here. Observed twice on one task: t
 proposed a sensible design, asked "Do you approve this design?", and exited **rc=0** having
 written nothing, in 57 and 69 seconds. Both runs looked like clean successes from the outside.
 
-Without the signal line the orchestrator has nothing to block on and degrades to
+Without that chain-appended signal the orchestrator has nothing to block on and degrades to
 screen-scraping.
+
+### Run each worker in a linked worktree
+
+`dispatch-worker.sh` puts each worker in `<repo>/.sprint/worktrees/<task>` on a `sprint/<task>`
+branch by default. Pass `--in-place` to override, and expect trouble if you do.
+
+This is a correctness requirement, not hygiene. A Codex worker inherits the operator's
+PreToolUse policy, which permits edits only when `git rev-parse --absolute-git-dir` differs
+from `--git-common-dir`. That is true inside a linked worktree and false in a main checkout:
+
+```bash
+cd "$REPO"                       && git rev-parse --absolute-git-dir --git-common-dir
+cd "$REPO/.sprint/worktrees/T1"  && git rev-parse --absolute-git-dir --git-common-dir
+```
+
+The policy inspects the worker's **cwd**, not the path being written. A worker that creates a
+worktree and then patches into it from the main checkout is still refused, which is exactly
+how three dispatches stalled with no error and no signal. The dispatcher proves the predicate
+holds before spending a worker on it.
+
+Isolation is the second benefit: a worker's edits land on its own branch, so a wrong answer
+never touches the main checkout and two workers cannot see each other's half-finished state.
 
 ### Worker routing matrix
 
@@ -427,6 +454,37 @@ attention; `read-screen` per surface tells you which worker. When per-worker sta
 more than a single-screen view, give each worker its own workspace with
 `cmux new-workspace --command ...` instead of a split.
 
+### Can workers talk to each other
+
+Default answer: no, and they should not need to. The root mediates, and two workers that need
+to talk mid-task are a dependency edge you failed to draw in the DAG. Turn the conversation
+into an edge and the second worker into a later wave.
+
+Worktree isolation makes this concrete rather than a preference. Each worker is on its own
+branch in its own checkout, so it cannot see another worker's half-finished state even if it
+looks. That is the point: partial work is not a contract, and a worker that reads another's
+uncommitted file has coupled itself to something that may still be reverted.
+
+Three mechanisms exist, in the order you should reach for them:
+
+| Need | Mechanism | Cost |
+|---|---|---|
+| B needs A's finished output | a `depends_on` edge; B runs in a later wave | none, this is the DAG doing its job |
+| B needs A's interface but not its tests | root merges A's branch, then dispatches B | one extra wave, full attribution |
+| B must block mid-task on A reaching a point | `cmux wait-for` as a named rendezvous | real coupling, use sparingly |
+
+The rendezvous is a genuine primitive, not a workaround: `cmux wait-for -S <name>` signals and
+`cmux wait-for <name> --timeout N` blocks, returning rc=0 when signalled and rc=1 on timeout.
+A worker can therefore block on `interface-frozen` while another signals it. Reach for it only
+on the tests-after-interface seam, where the alternative is serialising a long task behind a
+short one, and name the token in both briefs so the coupling is visible in the plan.
+
+What you should not do is let workers `cmux send` into each other's surfaces. It works, and it
+produces a sprint whose failures are unattributable: when the result is wrong you cannot tell
+which worker's instruction caused it, the root's ledger no longer describes what happened, and
+the three-strikes policy has nothing coherent to re-brief. Keep the star topology. The root is
+the only writer of instructions.
+
 ### Failure policy
 
 Three strikes per task. On a failed verification, re-brief the same worker with the failure
@@ -482,6 +540,27 @@ cp src/store/db.py /tmp/db.bak && git checkout HEAD~1 -- src/store/db.py
 make test 2>&1 | tail -3      # MUST be red
 command cp -f /tmp/db.bak src/store/db.py
 ```
+
+Collect each task branch before you verify the whole. The worker leaves its output
+uncommitted in its own worktree, so the root commits it on the task branch and merges:
+
+Workers differ in whether they commit. Opus workers committed their own output, in RED then
+GREEN pairs; Codex workers left it uncommitted in the worktree. Collection must tolerate both
+or it fails on whichever kind you did not expect:
+
+```bash
+W="$REPO/.sprint/worktrees/$TASK"
+if [ -n "$(git -C "$W" status --porcelain)" ]; then
+  git -C "$W" add -A
+  git -C "$W" commit -m "feat(scope): $TASK"
+fi
+git -C "$REPO" merge --no-ff --no-edit "sprint/$TASK"
+git -C "$REPO" worktree remove "$W" --force && git -C "$REPO" branch -d "sprint/$TASK"
+```
+
+Merge one task at a time and run the suite after each, so a conflict or a regression is
+attributable to a single worker. `git -C "$REPO" worktree list` afterwards must show only the
+main checkout: a worktree that outlives its task is the litter a blocked worker leaves behind.
 
 Close every remaining worker surface and confirm against the tree.
 

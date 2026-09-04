@@ -7,19 +7,46 @@
 # is rewritten with words from those arguments before the agent ever reads it.
 # A referenced file is read from disk and is not rewritten.
 #
-# Usage: dispatch-worker.sh <sol|opus> <task-id> <brief-path> <repo>
-# Prints: "<task> <agent> <surface> <token>" for the dispatch ledger.
+# Usage: dispatch-worker.sh <sol|opus> <task-id> <brief-path> <repo> [--in-place]
+# Prints: "<task> <agent> <surface> <token> <workdir>" for the dispatch ledger
+#
+# By default the worker runs in a LINKED GIT WORKTREE, not the main checkout.
+# That is not tidiness. A Codex worker inherits the operator's PreToolUse policy,
+# which refuses edits unless `git rev-parse --absolute-git-dir` differs from
+# `--git-common-dir` - true only inside a linked worktree. The policy inspects the
+# worker's CWD, so creating a worktree and staying in the main checkout does not
+# satisfy it: that is exactly how three dispatches stalled with no error.
+# --in-place skips the worktree; expect the policy to block a Codex worker..
 set -uo pipefail
 
 agent="${1:?agent: sol|opus}"
 task="${2:?task id}"
 brief="${3:?brief path}"
 repo="${4:?repo path}"
+mode="${5:-worktree}"
 
 [ -f "$brief" ] || { echo "FATAL: brief not found: $brief" >&2; exit 1; }
 [ -d "$repo" ]  || { echo "FATAL: repo not found: $repo" >&2; exit 1; }
 
 tok="sprint-${task}"
+
+# Where the worker will run.
+workdir="$repo"
+if [ "$mode" != "--in-place" ]; then
+  workdir="$repo/.sprint/worktrees/$task"
+  branch="sprint/$task"
+  if [ ! -d "$workdir" ]; then
+    git -C "$repo" worktree add -q "$workdir" -b "$branch" 2>/dev/null \
+      || git -C "$repo" worktree add -q "$workdir" "$branch" \
+      || { echo "FATAL: could not create worktree for $task at $workdir" >&2; exit 1; }
+  fi
+  # Prove the policy predicate holds before we spend a worker on it.
+  a=$(git -C "$workdir" rev-parse --absolute-git-dir 2>/dev/null)
+  c=$(cd "$workdir" 2>/dev/null && git rev-parse --git-common-dir 2>/dev/null)
+  case "$c" in /*) ;; *) c="$(cd "$workdir" && cd "$c" && pwd)" ;; esac
+  [ -n "$a" ] && [ "$a" != "$c" ] || {
+    echo "FATAL: $workdir is not a linked worktree (git-dir '$a' == common '$c')" >&2; exit 1; }
+fi
 
 case "$agent" in
   # --dangerously-bypass-approvals-and-sandbox lets the worker write files without
@@ -44,8 +71,8 @@ esac
 # file so the orchestrator can tell "finished" from "succeeded", and still verify
 # the task's own done-when condition independently.
 mkdir -p "$repo/.sprint/status"
-chain="cd $repo && $cmd; echo \$? > $repo/.sprint/status/$task.rc; cmux wait-for -S $tok"
+chain="cd $workdir && $cmd; echo \$? > $repo/.sprint/status/$task.rc; cmux wait-for -S $tok"
 cmux send --surface "$surface" "$chain"'\n' >/dev/null || {
   echo "FATAL: send failed for $task on $surface" >&2; exit 1; }
 
-echo "$task $agent $surface $tok"
+echo "$task $agent $surface $tok $workdir"

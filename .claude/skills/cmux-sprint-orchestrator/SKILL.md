@@ -487,9 +487,36 @@ the only writer of instructions.
 
 ### Failure policy
 
-Three strikes per task. On a failed verification, re-brief the same worker with the failure
-output appended, at most twice. On the third failure, or on any repeated identical output
-(a loop):
+Three strikes per task, and the strike that matters most is the quiet one.
+
+The dangerous worker is not the one that errors. It is the one that exits **0**, leaves its own
+suite **green**, and is wrong anyway. Observed: a task under-specified its tie-breaking rule, a
+Codex worker reached for the standard library exactly as the brief suggested, documented the
+tie-to-even behaviour it had chosen in a docstring, exited 0 with 24 tests passing, and failed
+half the sprint's acceptance cases. Nothing in the pane, the exit status or the worker's suite
+said so. Only the root's own acceptance check did.
+
+That is the whole argument for re-running done-when yourself. A worker's green suite tests what
+the worker decided to build.
+
+**Re-briefing is a new dispatch, not a conversation.** The worker process has already exited, so
+you cannot reply to it. Re-dispatch the same task id: `dispatch-worker.sh` reuses the existing
+`.sprint/worktrees/<task>`, so the worker opens its own previous attempt and fixes it in place
+rather than starting over. A re-brief that lands the fix contains four things, in this order:
+
+1. That this is attempt N of 3, and that the previous attempt is already in the worktree.
+2. The failure output verbatim, passing cases included. Showing which cases passed tells the
+   worker the shape of the rule rather than only that it is wrong.
+3. A one-line diagnosis naming the cause, and saying plainly where the brief was at fault when
+   it was. A worker told its defensible call was reasonable but superseded fixes the code; one
+   told it was simply wrong tends to rewrite more than it needs to.
+4. The requirement, now stated explicitly, with the exact expected values.
+
+That recipe fixed the rounding task on attempt 2: all eight acceptance cases correct, the
+docstring rewritten to state the real rule, four tie tests added, and reverting the fix takes
+the suite red, so the new tests discriminate.
+
+On the third failure, or on any repeated identical output (a loop):
 
 1. `cmux read-screen --surface "$S" --lines 100 --scrollback` and keep the dump.
 2. Close the surface and confirm the close against `cmux tree`.
@@ -497,7 +524,8 @@ output appended, at most twice. On the third failure, or on any repeated identic
 4. Re-diagnose at the root. A task that failed three times has a wrong brief or a wrong DAG
    edge, not an unlucky worker. Fix the plan, and say in the report that you did.
 
-Never dispatch a replacement worker for a task whose brief you have not changed.
+Never dispatch a replacement worker for a task whose brief you have not changed. Re-running an
+unchanged brief is how three strikes get spent on one bug.
 
 ## Phase 3: consolidation and verification
 

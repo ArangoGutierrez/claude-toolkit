@@ -91,16 +91,41 @@ this session and pasted. A remembered module list is not evidence.
 ```bash
 git -C "$REPO" status --short          # must be clean, and stay clean
 git -C "$REPO" log --oneline -10
-rg --files "$REPO" | sed 's|.*\.||' | sort | uniq -c | sort -rn | head   # language mix
-rg -n '^(import|from|require|use )' "$REPO" --stats | tail -5            # dependency shape
+
+# Scratch dir, self-ignoring so the census and logs never dirty git status.
+mkdir -p "$REPO/.sprint" && printf '*\n' > "$REPO/.sprint/.gitignore"
+
+# File census. `rg --files` alone SKIPS HIDDEN DIRECTORIES, so a repo that keeps
+# its content under .claude/, .github/ or .cursor/ reports a fraction of itself.
+git -C "$REPO" ls-files > "$REPO/.sprint/census.txt"                   # tracked files
+# not a git repo? use: rg --files --hidden --glob '!.git' "$REPO"
+wc -l < "$REPO/.sprint/census.txt"
+
+# Language mix. The `grep '\.'` guard matters: an extensionless file (LICENSE,
+# Makefile) would otherwise have its whole path counted as an extension.
+grep '\.' "$REPO/.sprint/census.txt" | sed 's|.*\.||' | sort | uniq -c | sort -rn | head
+
+# Dependency shape, over the census rather than a fresh blind walk.
+rg -n '^(import|from|require|use )' --hidden --glob '!.git' "$REPO" --stats | tail -5
 ls "$REPO"/{Makefile,justfile,package.json,pyproject.toml,go.mod} 2>/dev/null
 ```
+
+Prove the census can see before you trust what it does not show. Pick a file you
+already know exists, ideally a deep or hidden one, and confirm it is in the list:
+
+```bash
+grep -c 'some/file/you/know/exists' "$REPO/.sprint/census.txt"   # must be >= 1
+```
+
+Measured on a real repo, the difference is not marginal: `rg --files` reported 56
+files where `git ls-files` reported 383, and it listed exactly 0 of the 246 files
+under `.claude/`. A census that cannot see a directory reports no work there and
+no risk there, and the DAG you build on it inherits both blind spots.
 
 Then run the existing suite once, unchanged, and record the result. A green baseline is the
 only thing that makes a Phase 3 regression legible.
 
 ```bash
-mkdir -p "$REPO/.sprint" && printf '*\n' > "$REPO/.sprint/.gitignore"
 ( cd "$REPO" && make test ) > "$REPO/.sprint/baseline.log" 2>&1; echo "baseline rc=$?"
 tail -5 "$REPO/.sprint/baseline.log"
 ```

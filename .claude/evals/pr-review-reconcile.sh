@@ -67,8 +67,17 @@ check "corroborated records require their surface" \
   "required: \['findingIndex', 'reviewer', 'commentId', 'surface'\]"
 check "the attached corroboration carries the surface through" "surface: c.surface"
 
+# The corroboration is attached BY INDEX, so the array reconcilePrompt renders is
+# the array the write-back has to index. The check above catches the write-back
+# side; this one catches the prompt side, which no behaviour test can see because
+# the harness records agent labels and never prompt text. Hand the prompt
+# `survivors` while indexing `finalFindings` and the phase silently cites a bot
+# comment on a finding Verify already dropped, which then posts under our name.
+check "reconcilePrompt is handed the same array the write-back indexes" \
+  "reconcilePrompt(finalFindings"
+
 if [ "$fails" -gt 0 ]; then
     echo "EVAL $NAME: FAIL - $fails Reconcile invariant(s) broken (see the FAIL lines above)"
     exit 1
 fi
-echo "EVAL $NAME: PASS - all 11 Reconcile invariants hold"
+echo "EVAL $NAME: PASS - all 12 Reconcile invariants hold"

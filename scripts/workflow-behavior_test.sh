@@ -207,14 +207,23 @@ expect "fanout-all-dead: no scorer agent ran" \
 # Case 7: THE DISCRIMINATOR for invariant 2. Four reviewers die, one lives and
 # honestly reports nothing. A guard keyed on findings.length (rather than on
 # reviewers that RETURNED) would turn this clean PR into an error.
+#
+# summarize:body is stubbed rather than left on the null default: a clean PR is
+# approved on the thanks line Summarize writes, so the phase runs here even with
+# nothing to report, and a dead summarizer would add a sixth entry to the
+# degraded list the case below pins at exactly the 4 dead reviewers.
 # ---------------------------------------------------------------------------
 cat > "$TMP/fanout-one-live-empty.json" <<EOF
 {"args": $FARGS,
  "agent": {"default": null,
-   "byLabel": {"review:bug-scan": {"findings": [], "degraded": false}}}}
+   "byLabel": {"review:bug-scan": {"findings": [], "degraded": false},
+               "summarize:body": {"thanks": "nice work", "summary_lead": ""}}}}
 EOF
 run fanout-one-live-empty "$FANOUT"
-expect "fanout-one-live-empty: all 5 reviewers launched" '.agents | length == 5' fanout-one-live-empty
+expect "fanout-one-live-empty: all 5 reviewers launched" \
+  '[.agents[] | select(startswith("review:"))] | length == 5' fanout-one-live-empty
+expect "fanout-one-live-empty: 6 agents total (5 reviewers + 1 summarize), no scorer, merge or verify" \
+  '.agents | length == 6' fanout-one-live-empty
 expect "fanout-one-live-empty: NO error field (a live reviewer found nothing)" \
   '.return | has("error") | not' fanout-one-live-empty
 # Assert the TYPE as well as the length: jq evaluates `null | length` to 0, so a
@@ -240,6 +249,13 @@ expect "fanout-one-live-empty: the LIVE reviewer is not marked degraded" \
 # per-finding scorer reads and the {scores:[{id}]} list the batch scorer reads —
 # so this abort-guard case stays valid across the scorer change and never had to
 # be rewritten to keep passing.
+#
+# The verify: stub returns refuted false deliberately. A refuted finding is
+# dropped before it can post, which would take the survivor this case is about
+# with it; the point here is the degraded list, not the refuter. Both it and the
+# summarize:body stub keep those two agents out of degradedReviewers, so the
+# assertion below still means "exactly the reviewers that died", which is what
+# catches a reviewer vanishing.
 # ---------------------------------------------------------------------------
 cat > "$TMP/fanout-partial.json" <<EOF
 {"args": $FARGS,
@@ -248,9 +264,11 @@ cat > "$TMP/fanout-partial.json" <<EOF
      "review:bug-scan": {"findings": [
        {"file":"src/a.js","line":42,"description":"off-by-one","category":"bug","severity":"must-fix","reason":"loop overruns"}],
       "degraded": false},
-     "review:code-comments": {"findings": [], "degraded": false}},
+     "review:code-comments": {"findings": [], "degraded": false},
+     "summarize:body": {"thanks": "nice work", "summary_lead": ""}},
    "byLabelPrefix": {"score:": {"score": 90, "rationale": "real",
-                                "scores": [{"id": 0, "score": 90, "rationale": "real"}]}}}}
+                                "scores": [{"id": 0, "score": 90, "rationale": "real"}]},
+                     "verify:": {"refuted": false, "reason": "the loop does overrun"}}}}
 EOF
 run fanout-partial "$FANOUT"
 expect "fanout-partial: NO error field (2 of 5 reviewers returned)" \
@@ -285,8 +303,12 @@ expect "fanout-batch-count: 3 findings from one reviewer spawn exactly ONE score
   '[.agents[] | select(startswith("score:"))] | length == 1' fanout-batch-count
 expect "fanout-batch-count: the scorer is labelled per reviewer, not per finding" \
   '[.agents[] | select(startswith("score:"))] == ["score:bug-scan"]' fanout-batch-count
-expect "fanout-batch-count: 6 agents total (5 reviewers + 1 scorer), not 8" \
-  '.agents | length == 6' fanout-batch-count
+# 5 reviewers + 1 scorer + 1 merge:dedupe + 3 verify:* (one per inline finding)
+# + 1 summarize:body. Merge is one call for the whole set, not one per pair, and
+# Summarize is one call for the whole body: an unplanned extra agent, or a phase
+# that fans out per finding when it should not, moves this number.
+expect "fanout-batch-count: 11 agents total (5 reviewers + 1 scorer + 1 merge + 3 verify + 1 summarize)" \
+  '.agents | length == 11' fanout-batch-count
 expect "fanout-batch-count: batching loses no finding — all 3 scored and survive" \
   '.return.counts.raw == 3 and .return.counts.survived == 3' fanout-batch-count
 
@@ -532,8 +554,11 @@ expect "reconcile-on: the novel claim scored 50 is dropped" \
   '[.return.findings[] | select(.file == "src/dropped.js")] | length == 0' reconcile-on
 expect "reconcile-on: 2 novel claims seen, 1 kept" \
   '.return.reconcile.novel == 2 and .return.reconcile.novelKept == 1' reconcile-on
-expect "reconcile-on: counts.survived includes the kept novel claim" \
-  '.return.counts.raw == 1 and .return.counts.survived == 2' reconcile-on
+# survived counts what cleared the score threshold and nothing else, so a novel
+# claim Reconcile appended cannot hide inside it. posting is the size of the list
+# the caller posts, which is where the kept claim shows up: 1 of ours + 1 novel.
+expect "reconcile-on: counts.posting includes the kept novel claim, counts.survived does not" \
+  '.return.counts.raw == 1 and .return.counts.survived == 1 and .return.counts.posting == 2' reconcile-on
 
 # ---------------------------------------------------------------------------
 # Case 16: the skip contract. Without aiCommentsPath a PR must review EXACTLY
@@ -577,6 +602,141 @@ expect "reconcile-skip: contradictions is present and is an empty array" \
   '(.return.contradictions | type) == "array" and (.return.contradictions | length == 0)' reconcile-skip
 expect "reconcile-skip: counts are exactly what they were before the phase existed" \
   '.return.counts.raw == 1 and .return.counts.survived == 1' reconcile-skip
+
+# ---------------------------------------------------------------------------
+# Case 17: the abort RETURNS, it does not decorate. Case 6 pins what the abort
+# hands back; this case pins what it never runs. With the guard at the bottom of
+# the file it only stamped an error onto an already-built `out`, so a run where
+# no reviewer returned anything still launched summarize:body to write the thanks
+# line for a pull request nobody read, and reconcile to compare our empty finding
+# list against the bot comments.
+#
+# aiCommentsPath is set on purpose. It is the ONLY gate Reconcile has, and that
+# phase is deliberately not gated on having findings of our own, so with the key
+# present the hoisted return is the one thing standing between this scenario and
+# a reconcile agent. Every stub is left on the null default so that removing the
+# early return moves BOTH assertions: .agents grows from 5 to 7, and the two dead
+# post-Score agents add their own entries to degradedReviewers.
+# ---------------------------------------------------------------------------
+DARGS='{"diffPath":"/tmp/probe.diff","prNumber":7,"ownerRepo":"o/r","repoCheckout":"/tmp/co","domains":[],"claudeMdPaths":["/tmp/CLAUDE.md"],"aiCommentsPath":"/tmp/ai-comments.json"}'
+
+cat > "$TMP/fanout-all-dead-stops.json" <<EOF
+{"args": $DARGS, "agent": {"default": null}}
+EOF
+run fanout-all-dead-stops "$FANOUT"
+expect "fanout-all-dead-stops: the 5 reviewers are the only agents that ran" \
+  ".agents == $FREVIEWERS" fanout-all-dead-stops
+expect "fanout-all-dead-stops: no merge, verify, reconcile or summarize agent ran" \
+  '[.agents[] | select(startswith("merge:") or startswith("verify:") or startswith("reconcile") or startswith("summarize:"))] | length == 0' fanout-all-dead-stops
+expect "fanout-all-dead-stops: the Reconcile phase is never entered" \
+  '[.phases[] | select(. == "Reconcile")] | length == 0' fanout-all-dead-stops
+# Exactly 5, and every one of them a reviewer death. A summarize or reconcile
+# entry here means an agent ran past the abort and logged its own death as
+# degradation, which reads to the caller as a review that ran below full
+# strength rather than one that never ran at all.
+expect "fanout-all-dead-stops: degradedReviewers holds the 5 reviewer deaths and nothing else" \
+  '(.return.degradedReviewers | length == 5) and ([.return.degradedReviewers[] | select(endswith("(agent returned no result)"))] | length == 5)' fanout-all-dead-stops
+expect "fanout-all-dead-stops: the early return still carries the abort error and the counts" \
+  '.return.error == "pr-review-fanout: all 5 of 5 reviewer agent(s) died; no review ran" and .return.counts.posting == 0 and .return.counts.refuted == 0' fanout-all-dead-stops
+expect "fanout-all-dead-stops: the abort still answers thanks and summary_lead, as empty strings" \
+  '.return.thanks == "" and .return.summary_lead == ""' fanout-all-dead-stops
+# ---------------------------------------------------------------------------
+# Case 18: Verify actually DROPS what it refutes, and the counts say so.
+#
+# Every other fanout case stubs the refuter dead or absent, so the drop itself
+# was never exercised: replacing the post-refutation filter with a plain copy
+# left the whole suite green while a finding the pipeline had just proved wrong
+# went on to post as an inline comment on someone's pull request.
+#
+# Two must-fix findings, both clearing the score bar, one refuted and one not.
+# The findings are looked up BY FILE, never by position, so the case cannot
+# inherit the ordering bug it is hunting.
+#
+# The corroboration is the second thing this pins. findingIndex 0 means "the
+# first entry of the list reconcilePrompt was shown", and that list is the
+# POST-refutation one, so it must land on src/kept.js. Disable the drop and
+# index 0 becomes src/refuted.js instead, which is the index hazard the phase
+# order created, caught here from the outside.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-refuted-drop.json" <<EOF
+{"args": $RARGS,
+ "agent": {"default": null,
+   "byLabel": {
+     "review:bug-scan": {"findings": [
+       {"file":"src/refuted.js","line":1,"description":"the refuter kills this one","category":"bug","severity":"must-fix","reason":"ra"},
+       {"file":"src/kept.js","line":2,"description":"the refuter cannot kill this one","category":"bug","severity":"must-fix","reason":"rb"}],
+      "degraded": false},
+     "score:bug-scan": {"scores": [{"id":0,"score":95,"rationale":"s0"},{"id":1,"score":95,"rationale":"s1"}]},
+     "merge:dedupe": {"clusters": []},
+     "verify:src/refuted.js:1": {"refuted": true, "reason": "the guard three lines up covers it"},
+     "verify:src/kept.js:2": {"refuted": false, "reason": "the caller reaches it with nil"},
+     "reconcile": {"corroborated": [{"findingIndex":0,"reviewer":"CodeRabbit","commentId":111,"surface":"inline","url":"u111"}],
+                   "contradicted": [], "novel": []},
+     "summarize:body": {"thanks": "Thanks for tightening the retry path.",
+                        "summary_lead": "One finding did not survive refutation."}}}}
+EOF
+run fanout-refuted-drop "$FANOUT"
+expect "fanout-refuted-drop: the refuted finding does not post" \
+  '[.return.findings[] | select(.file == "src/refuted.js")] | length == 0' fanout-refuted-drop
+expect "fanout-refuted-drop: exactly one finding posts, and it is the one the refuter kept" \
+  '(.return.findings | length == 1) and ([.return.findings[] | select(.file == "src/kept.js")] | length == 1)' fanout-refuted-drop
+# All four numbers, because they only mean anything against each other: raw
+# drops to survived by score, survived drops by refuted, posting is what the
+# caller puts on the pull request. Hardcoding refuted to 0 passes every other
+# case in this file.
+expect "fanout-refuted-drop: counts separate what survived scoring from what posts" \
+  '.return.counts.raw == 2 and .return.counts.survived == 2 and .return.counts.refuted == 1 and .return.counts.posting == 1' fanout-refuted-drop
+expect "fanout-refuted-drop: the refutation reaches the log with its count" \
+  '.logs | index("pr-review-fanout: verify refuted 1 of 2 inline finding(s)") != null' fanout-refuted-drop
+expect "fanout-refuted-drop: corroboration index 0 lands on the post-refutation list, not on the dropped finding" \
+  '[.return.findings[] | select(.file == "src/kept.js")][0].corroborates.comment_id == 111' fanout-refuted-drop
+# Summarize launches in several cases above; nothing read what it produced, so
+# returning a constant empty string for both fields stayed green. An empty
+# thanks is what the caller treats as a dead summarizer, and it approves a clean
+# pull request on that line.
+expect "fanout-refuted-drop: the Summarize output reaches out.thanks verbatim" \
+  '.return.thanks == "Thanks for tightening the retry path."' fanout-refuted-drop
+expect "fanout-refuted-drop: the Summarize output reaches out.summary_lead verbatim" \
+  '.return.summary_lead == "One finding did not survive refutation."' fanout-refuted-drop
+
+# ---------------------------------------------------------------------------
+# Case 19: a returned cluster actually STAMPS root_cause onto the findings it
+# names, and onto nothing else. Merge launching was pinned by the agent count
+# in case 9; its effect was not, so deleting the assignment inside applyClusters
+# left the suite green and the payload builder went on folding nothing.
+#
+# Three findings, a cluster over the first two. src/solo.js is the control: a
+# mutant that stamps every finding rather than the named ones fails on it.
+# ---------------------------------------------------------------------------
+cat > "$TMP/fanout-merge-cluster.json" <<EOF
+{"args": $FARGS,
+ "agent": {"default": null,
+   "byLabel": {
+     "review:bug-scan": {"findings": [
+       {"file":"src/dup-a.js","line":1,"description":"missing nil guard","category":"bug","severity":"must-fix","reason":"r0"},
+       {"file":"src/dup-b.js","line":2,"description":"the same missing nil guard, said differently","category":"bug","severity":"must-fix","reason":"r1"},
+       {"file":"src/solo.js","line":3,"description":"an unrelated off-by-one","category":"bug","severity":"must-fix","reason":"r2"}],
+      "degraded": false},
+     "merge:dedupe": {"clusters": [{"ids": [0, 1], "root_cause": "shared-nil-guard"}]},
+     "summarize:body": {"thanks": "Thanks for this.", "summary_lead": ""}},
+   "byLabelPrefix": {
+     "score:": {"scores": [{"id":0,"score":95,"rationale":"a"},{"id":1,"score":95,"rationale":"b"},{"id":2,"score":95,"rationale":"c"}]},
+     "verify:": {"refuted": false, "reason": "the path reaches all three"}}}}
+EOF
+run fanout-merge-cluster "$FANOUT"
+expect "fanout-merge-cluster: the first clustered finding carries the root_cause the agent named" \
+  '[.return.findings[] | select(.file == "src/dup-a.js")][0].root_cause == "shared-nil-guard"' fanout-merge-cluster
+expect "fanout-merge-cluster: so does its sibling" \
+  '[.return.findings[] | select(.file == "src/dup-b.js")][0].root_cause == "shared-nil-guard"' fanout-merge-cluster
+# The control. Stamping every finding would fold three separate defects into one
+# comment on a real review, which is worse than posting the near-duplicate.
+expect "fanout-merge-cluster: the finding outside the cluster carries no root_cause at all" \
+  '[.return.findings[] | select(.file == "src/solo.js")][0] | has("root_cause") | not' fanout-merge-cluster
+# Merge annotates, it never removes: the builder does the folding downstream.
+expect "fanout-merge-cluster: clustering drops nothing from the posted list" \
+  '(.return.findings | length) == 3 and .return.counts.posting == 3' fanout-merge-cluster
+expect "fanout-merge-cluster: the fold count reaches the log" \
+  '.logs | index("pr-review-fanout: merge folded 1 duplicate finding(s) into siblings") != null' fanout-merge-cluster
 
 echo "---"; echo "pass=$pass fail=$fail"
 [ "$fail" -eq 0 ]

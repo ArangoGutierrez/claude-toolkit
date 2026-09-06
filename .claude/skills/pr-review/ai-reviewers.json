@@ -1,0 +1,11 @@
+{
+  "comment": "Logins that identify an AI CODE REVIEWER. Not every bot: CI, coverage and dependency bots are deliberately absent, and user.type is not used because codecov-commenter posts as type User while github-actions[bot] is type Bot but reviews nothing. Verified entries were confirmed against a live PR on the date shown.",
+  "reviewers": [
+    {"login": "coderabbitai[bot]", "display": "CodeRabbit", "verified": "2026-08-28"},
+    {"login": "copilot-pull-request-reviewer[bot]", "display": "Copilot", "verified": "2026-08-28"},
+    {"login": "greptile-apps[bot]", "display": "Greptile", "verified": "2026-08-28"},
+    {"login": "cursor[bot]", "display": "Cursor", "verified": "2026-08-28"},
+    {"login": "sourcery-ai[bot]", "display": "Sourcery", "verified": "2026-08-28"},
+    {"login": "ellipsis-dev[bot]", "display": "Ellipsis", "verified": "2026-08-28"}
+  ]
+}

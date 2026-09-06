@@ -95,7 +95,7 @@ steps, and a first-session walkthrough.
 | **CLAUDE.md** | 1 | Engineering standards (TDD, worktrees, iteration budgets) |
 | **settings.json** | 1 | Permissions, hook wiring, plugin config, environment |
 | **Hooks** | 20 | inject-date, sign-commits, prevent-push-workbench, enforce-worktree, validate-year, tdd-guard, auto-format, bash-audit-log, budget-governor, build-helpers, context-watch, mutation-gate, permission-denied, pre-compact-context, reflection-staleness, session-goal-init, test-dep-map, test-quality-lint, graphify-graph-hint, verify-gate |
-| **Skills** | 15 | config-audit, eureka, go-review, goal, handoff, k8s-debug, kickoff, pr-review-ingest, reflection, skill-eval, tdd-protocol, team-{plan,execute,shutdown}, worktree-guide — each ships a human-facing README; see the [Skills & Commands reference](docs/skills-and-commands.md) |
+| **Skills** | 16 | config-audit, eureka, go-review, goal, handoff, k8s-debug, kickoff, pr-review, pr-review-ingest, reflection, skill-eval, tdd-protocol, team-{plan,execute,shutdown}, worktree-guide — each ships a human-facing README; see the [Skills & Commands reference](docs/skills-and-commands.md) |
 | **Rules** | 9 | constitution, go/k8s/container conventions, git-workflow, security, graphify, shell-conventions, learned-anti-patterns |
 | **Evals** | 1 | Failure→Eval framework (`.claude/evals/`) with a template and the `scripts/run-evals.sh` runner |
 | **Agents** | 4 | doc-writer, explorer, principal-engineer, qa-engineer |

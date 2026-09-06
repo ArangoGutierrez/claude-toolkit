@@ -8,9 +8,11 @@ Reads the hook JSON payload on stdin.
   exit 2 = block, and stderr becomes Claude's feedback
 No other exit code is ever returned; a detection is never exit 1.
 
-Only the NEW text is inspected, never the file on disk. The repo already holds
-hundreds of markdown files with emoji and em-dashes, and reading from disk would
-re-litigate every one of them on the next unrelated edit.
+Only the NEW text is inspected. The repo already holds hundreds of markdown files
+with emoji and em-dashes, and re-litigating every one of them on the next
+unrelated edit is exactly what this avoids. The file on disk is read for one
+purpose only, and only when the payload carries a whole file body in `content`:
+to subtract the lines that are already there, so what remains is the new text.
 
 Tool coverage: Write, Edit and NotebookEdit have their new text scanned for every
 category. Bash commands are scanned for the two commit-trailer regexes ONLY, which
@@ -185,10 +187,81 @@ def find_trailers(text):
     return found
 
 
-def find_tells(content):
+FENCE_RE = re.compile(r"^\s*(`{3,}|~{3,})")
+
+
+def fenced_line_numbers(lines):
+    """1-based line numbers inside CLOSED fenced code blocks, markers included.
+
+    Fenced content is pasted tool output, not model prose. Scanning it made any
+    report carrying its own evidence unwritable, which pushed authors toward
+    quietly editing the evidence to satisfy the check.
+
+    Only CLOSED fences are skipped. An unterminated fence grants nothing, so
+    opening one and never closing it cannot be used to exempt a whole file.
+    """
+    skip = set()
+    index = 0
+    while index < len(lines):
+        opener = FENCE_RE.match(lines[index])
+        if not opener:
+            index += 1
+            continue
+        marker = opener.group(1)
+        char, width = marker[0], len(marker)
+        for close in range(index + 1, len(lines)):
+            stripped = lines[close].strip()
+            if stripped and stripped == char * len(stripped) and len(stripped) >= width:
+                skip.update(range(index + 1, close + 2))
+                index = close + 1
+                break
+        else:
+            index += 1
+    return skip
+
+
+def unchanged_line_numbers(content, path):
+    """1-based line numbers of content whose exact text is already in the file.
+
+    Some editors send the whole new file body in the `content` field for what is
+    logically a one-line edit, instead of only the replaced span. Scanning all of
+    it contradicts the rule at the top of this file: a line that is already in
+    the file is not new text, and re-reporting it makes any file carrying a
+    legacy tell permanently unwritable, because nothing the author does to their
+    own added line can ever clear the message.
+
+    Whole-line equality rather than a diff: order independent, and it errs toward
+    scanning. A line the author actually typed is absent from the on-disk set and
+    is scanned; a line that merely moved keeps its exemption, which is correct
+    because the tell was already in the file either way.
+
+    Any failure returns an empty set, so the whole body is scanned. That is the
+    blocking direction, not the allowing one. The except is deliberately broad:
+    this runs BEFORE detection, where the module's fail-open policy still
+    applies, so an exception escaping here would turn a real tell into a silent
+    allow. A path holding a lone surrogate does exactly that, raising
+    UnicodeEncodeError rather than OSError when the filename is encoded.
+    """
+    try:
+        with open(path, "rb") as handle:
+            raw = handle.read()
+    except Exception:
+        return set()
+    existing = set(raw.decode("utf-8", errors="replace").split("\n"))
+    return {
+        lineno
+        for lineno, line in enumerate(content.split("\n"), start=1)
+        if line in existing
+    }
+
+
+def find_tells(content, skip_extra=None):
     """Return [(category, matched_text, line_number)] for every distinct tell."""
     found = find_trailers(content)
     seen = set(found)
+    skip_lines = fenced_line_numbers(content.split("\n"))
+    if skip_extra:
+        skip_lines = skip_lines | set(skip_extra)
 
     def record(category, text, lineno):
         key = (category, text, lineno)
@@ -197,6 +270,8 @@ def find_tells(content):
             found.append(key)
 
     for lineno, line in enumerate(content.split("\n"), start=1):
+        if lineno in skip_lines:
+            continue
         for match in EMOJI_RE.finditer(line):
             record("emoji", match.group(0), lineno)
         for match in EM_DASH_RE.finditer(line):
@@ -289,15 +364,23 @@ def main():
         return 0
 
     content = None
+    field_used = None
     for field in CONTENT_FIELDS:
         value = tool_input.get(field)
         if isinstance(value, str) and value:
             content = value
+            field_used = field
             break
     if content is None:
         return 0
 
-    tells = find_tells(content)
+    # `content` carries the whole file body, so the lines already on disk are not
+    # new text. `new_string` and `new_source` are the new span already.
+    skip_extra = None
+    if field_used == "content":
+        skip_extra = unchanged_line_numbers(content, path)
+
+    tells = find_tells(content, skip_extra)
     if not tells:
         return 0
 

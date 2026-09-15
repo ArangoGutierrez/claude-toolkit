@@ -60,6 +60,7 @@ Run when the user types `/kickoff <rough idea>`.
    ```
    Goal: <Scoped prompt (or the raw idea on passthrough)>
    Budget: <the **Budget:** value from the Kickoff block>
+   Tier: <T1|T2|T3|T4, per "Complexity tier" below>
    Acceptance:
    - <checklist item 1>
    - <checklist item 2>
@@ -75,7 +76,9 @@ Run when the user types `/kickoff <rough idea>`.
    observable later. (On passthrough,
    omit the `Acceptance:` items; brainstorming will establish them.)
 
-4. **Enter the right path:**
+4. **Enter the right path** (first obey what the declared tier forbids: a
+   T1 or T2 tier bars the census agent and the panel outright, and T1 also
+   bars briefs, builders and critics):
    - **Execution = solo** (or passthrough) → invoke `superpowers:brainstorming`,
      seeded with the scoped prompt.
    - **Execution = orchestrate** → if the Kickoff block contains a
@@ -100,6 +103,31 @@ Run when the user types `/kickoff <rough idea>`.
      Without a Dispatch plan section, invoke
      `superpowers:brainstorming` focused on decomposing the work into disjoint,
      parallelizable tasks, then hand off to `team-plan` as before.
+
+## Complexity tier (declare before any dispatch)
+
+The tier is declared in step 3, before step 4 dispatches anything, and it goes
+in the goal file so it survives compaction. Each tier names what is FORBIDDEN,
+not what is allowed: allow-lists get read as suggestions and ignored.
+
+| Tier | Scope | Forbidden |
+|---|---|---|
+| T1 trivial | <=10 lines, 1-2 files, reversible config or docs | census agent, brief, builder, critic, panel. Chief edits directly, runs the narrowest relevant test, commits. Target under 10 minutes. |
+| T2 small | one concern, <=100 lines | census agent, panel. Chief direct or ONE builder. Targeted tests, self-review. |
+| T3 standard | multi-file feature or fix | nothing; this is the full step 4 flow. |
+| T4 risky | security, gates, migrations, multi-module | shipping without `review-verify` over the whole branch. |
+
+Size the machinery to the task. A fixed-cost loop (census, brief, builder,
+critic) aimed at a 6-line config edit is how issue 491 drew T4 treatment for T1
+work and lost the race to a 6-line MR that shipped first (2026-09-14).
+
+**The tier comes from the ask, and it is sticky.** A user signal like "quick MR"
+is binding, not decorative. A question the source issue marks deferred or
+unresolved is OUT OF SCOPE by default: do not promote it into a design fork. To
+pull it in, ask a cheap yes/no scope question ("do you want the range in this MR
+at all?"), never a design fork ("how should the range work?"). The first has a
+default already written in the issue; the second quadrupled the work and needed
+a panel. Any scope expansion re-declares the tier to the user, explicitly.
 
 The enricher is strictly additive — an enrichment failure must never block the
 kickoff.

@@ -268,7 +268,7 @@ FAKESTAT
 chmod +x "$FAKEBIN/stat"
 
 # A minimal, space-free PATH. run_hook passes $envs to `env` UNQUOTED so that
-# multiple KEY=VAL pairs split correctly — which means a value containing a
+# multiple KEY=VAL pairs split correctly, which means a value containing a
 # space splits too. This machine's PATH holds six "Application Support/..."
 # entries, so $FAKEBIN:$PATH made env try to run "Support/Claude/..." and
 # return 127, a false failure that looked like the hook crashing. $HIDBIN

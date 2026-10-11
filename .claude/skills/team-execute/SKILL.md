@@ -1,6 +1,6 @@
 ---
 name: team-execute
-description: Use when a team plan exists in .agents/plans/ and the agent team needs to be spawned for implementation
+description: Use when a team plan exists in .agents/plans/ and the agent team needs to be spawned for implementation. Takes the project name as its argument (/team-execute <project-name>).
 user-invocable: true
 argument-hint: <project-name>
 ---

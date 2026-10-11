@@ -88,3 +88,36 @@ def test_cli_aggregate_uses_default_config_when_omitted(tmp_path, capsys, monkey
         "--recommended-label", "Option A",
     ])
     assert rc == 0
+
+
+def test_cli_aggregate_threads_the_question_file_to_the_stakes_policy(tmp_path, capsys, monkeypatch):
+    """--question-file reaches the stakes policy; without it the fork is high stakes."""
+    from panel.cli import main
+    monkeypatch.delenv("CLAUDE_PANEL", raising=False)
+    cfg = _write_minimal_config(tmp_path)
+    verdicts = tmp_path / "work"
+    _write_verdict(verdicts, "da-test", "HOLD", "ok", "n/a")
+    qfile = tmp_path / "question.json"
+    qfile.write_text(json.dumps({
+        "question": "[reversible] Which cache layout?",
+        "options": [{"label": "Option A (Recommended)", "description": "Keep the cache local"},
+                    {"label": "Option B", "description": "Use a shared cache"}],
+        "recommended_label": "Option A (Recommended)",
+        "reasoning": "Keep the cache local",
+    }))
+    args = [
+        "aggregate",
+        "--config", str(cfg),
+        "--verdicts-dir", str(verdicts),
+        "--recommended-label", "Option A (Recommended)",
+    ]
+
+    assert main(args + ["--question-file", str(qfile)]) == 0
+    with_file = json.loads(capsys.readouterr().out.strip())
+    assert (with_file["stakes"], with_file["stakes_reason"], with_file["action"]) == (
+        "reversible", "tagged", "proceed")
+
+    assert main(args) == 0
+    without = json.loads(capsys.readouterr().out.strip())
+    assert (without["stakes"], without["stakes_reason"], without["action"]) == (
+        "high", "no_question", "ask_with_review")

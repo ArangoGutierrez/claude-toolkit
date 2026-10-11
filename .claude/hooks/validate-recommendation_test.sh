@@ -519,4 +519,24 @@ if ! grep -q 'event=presence session=t23 uuid=uuid-t23 hid_idle=30 marked=1 deci
     exit 1
 fi
 
+# Test 24: the block message sends the session to the directive's action,
+# not to the bare verdict. A HOLD on a high-stakes fork still asks the user,
+# so feedback reading "HOLD (auto-proceed)" would route around the stakes
+# policy.
+INPUT='{"tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Pick one","options":[{"label":"Option A (Recommended)","description":"a"},{"label":"Option B","description":"b"}]}]},"session_id":"uuid-t24"}'
+OUT=$(run_hook "$INPUT" "" "t24") && RC=0 || RC=$?
+if [ "$RC" != "2" ]; then
+    echo "FAIL test24 feedback: expected exit 2 (block), got $RC"
+    exit 1
+fi
+if ! echo "$OUT" | grep -qxF "  3. Act on the directive's action: proceed, proceed_noted, ask_with_review or ask"; then
+    echo "FAIL test24 feedback: step 3 should send the session to the directive's action"
+    echo "OUT: $OUT"
+    exit 1
+fi
+if echo "$OUT" | grep -qF 'HOLD (auto-proceed)'; then
+    echo "FAIL test24 feedback: the block message still says HOLD (auto-proceed)"
+    exit 1
+fi
+
 echo "PASS"

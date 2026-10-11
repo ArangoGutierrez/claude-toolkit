@@ -100,7 +100,7 @@ def check_text(path, text):
     def add(line, code, subject, message):
         findings.append(Finding(path, line, code, subject, message))
 
-    if text.startswith("﻿"):  # rule:E1
+    if text.startswith("\ufeff"):  # rule:E1
         add(1, "E1", "frontmatter", "file starts with a UTF-8 byte order mark; save it without one")
         return findings
     fm_lines = _split_frontmatter(text)

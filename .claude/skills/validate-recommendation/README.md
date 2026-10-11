@@ -30,8 +30,8 @@ review.
    - `proceed_noted`: take it and report the objection in the session's
      final summary (a reversible fork with a soft dissent)
    - `ask_with_review`: re-ask the user with the panel's review attached
-     (every high-stakes fork, every hard dissent, and everything under
-     `CLAUDE_PANEL=advise`)
+     (every high-stakes fork, every hard dissent, and every voted verdict
+     under `CLAUDE_PANEL=advise`)
    - `ask`: re-ask the original question (the panel failed)
 
 ## Configuration
@@ -59,7 +59,7 @@ it per your configured failure mode.
 | `CLAUDE_PANEL` | `on` | Controls panel behavior. `on` (default) acts on the directive's `action`, so it takes the recommendation only on a reversible fork (see Stakes). `advise` runs the panel but re-asks every question with the panel's commentary appended, which preserves user agency at the cost of one extra click per question. Advise ignores presence: it runs the panel even while you are at the Mac (trace `decision=advise`). `off` bypasses the panel entirely (hook exits without dispatching). |
 | `CLAUDE_PANEL_TIMEOUT` | `90` | Per-panelist timeout (seconds). |
 | `CLAUDE_PANEL_AWAY_AFTER` | `600` | Seconds without keyboard or mouse input on the Mac after which the user counts as away, so a marked question goes to the panel. Below it the question goes straight to the user. A non-numeric value falls back to 600; when the idle time cannot be read (not macOS), the panel runs. Set `0` to run the panel on every marked question, for unattended sessions. Only input on this Mac counts: answering from a phone, Remote Control or SSH reads as away. |
-| `CLAUDE_PANEL_TRACE_LOG` | `~/.claude/debug/panel-trace.log` | Path the hook and aggregator append verdict telemetry to. The trace log is **always written** (one `event=presence` line per question, one line per trigger, one line per verdict) so the operator can detect silent decay. Override path for tests or alternative routing. |
+| `CLAUDE_PANEL_TRACE_LOG` | `~/.claude/debug/panel-trace.log` | Path the hook and aggregator append verdict telemetry to. The trace log is **always written** (one `event=presence` line per `AskUserQuestion` call unless `CLAUDE_PANEL=off`, one line per trigger, one line per verdict) so the operator can detect silent decay. Override path for tests or alternative routing. |
 | `CLAUDE_PANEL_DEBUG` | unset | If set, the hook writes extra verbose lines to the trace log on top of the always-on telemetry. |
 
 ### Stakes
@@ -137,7 +137,7 @@ To reduce cost: `CLAUDE_PANEL=off` bypasses the panel entirely.
     │   ├── dispatch.py           (nat-* backend router)
     │   ├── stakes.py             (stakes of a question; verdict-to-action table)
     │   ├── cli.py                (CLI for manual debugging)
-    │   └── tests/                (pytest suite; 314 cases)
+    │   └── tests/                (pytest suite; 316 cases)
     ├── personas/                 (per-role persona files for config-driven dispatch)
     │   ├── da.md
     │   ├── pe.md
@@ -152,14 +152,15 @@ From this skill's directory:
 
 ```bash
 cd ~/.claude/skills/validate-recommendation
-PYTHONPATH="$HOME/.claude" python3 -m pytest panel/tests/ -q
+CLAUDE_PANEL_TRACE_LOG="$(mktemp)" PYTHONPATH="$HOME/.claude" python3 -m pytest panel/tests/ -q
 ```
 
-Expected: `314 passed`. The interpreter needs `pytest`, `pyyaml`,
+Expected: `316 passed`. The interpreter needs `pytest`, `pyyaml`,
 `requests` and `pydantic`: `tool/__init__.py` imports `requests` and
-`pydantic`, so without them the dispatch tests fail on import. CI runs the
-same command from the checkout with `PYTHONPATH` set to the checkout's
-`.claude`. The test suite covers the severity decision tree, stakes, the
+`pydantic`, so without them the dispatch tests fail on import. Point
+`CLAUDE_PANEL_TRACE_LOG` at a scratch file, or some tests append verdict
+lines to your live trace log. CI runs the same command from the checkout
+with `PYTHONPATH` set to the checkout's `.claude`. The test suite covers the severity decision tree, stakes, the
 JSON aggregator, config parsing, dispatch routing, and CLI wiring.
 
 ## E2E smoke test (post-install)
@@ -168,9 +169,10 @@ After syncing this skill to `~/.claude/`:
 
 1. Verify the config is present:
    ```bash
-   ~/.local/pipx/venvs/pytest/bin/python3.12 -m panel lint-config 2>&1 | head -5
+   cd ~/.claude/skills/validate-recommendation && \
+       PYTHONPATH="$HOME/.claude" python3 -m panel lint-config 2>&1 | head -5
    ```
-   Should print `Config valid`.
+   Should print `OK: <n> enabled panelist(s) (of <m> configured)`.
 
 2. Confirm `CLAUDE_PANEL` is unset (default = on):
    ```bash

@@ -10,7 +10,8 @@ produces one verdict: **HOLD**, **DISSENT** (soft or hard), or **ERROR** (a
 panelist failed to respond usefully). The aggregator turns the verdict and
 the question's stakes into an action. A reversible fork, whose question text
 starts with `[reversible]` and names no outward verb such as push, merge or
-deploy, proceeds on HOLD and on a soft dissent (the objection is noted).
+deploy, proceeds on HOLD and on a soft dissent (the objection is noted),
+unless `CLAUDE_PANEL=advise` is set.
 Every high-stakes fork, every hard dissent and every ERROR goes back to the
 user. The panel's behavior is entirely driven by one file, `config.yml`.
 

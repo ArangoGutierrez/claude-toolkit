@@ -2,8 +2,9 @@
 
 ## What this shows
 
-The validate-recommendation panel reviews every `(Recommended)` option in an
-`AskUserQuestion` by dispatching one or more configured panelists. This page
+The validate-recommendation panel reviews the `(Recommended)` option of an
+`AskUserQuestion` asked while the user is away from the Mac, by dispatching
+one or more configured panelists. This page
 dispatches a single devil's-advocate (`DA`) panelist against a sample question
 and captures its verdict, running the panelist's `nat-openai` backend against
 a `:free` OpenRouter model.
@@ -74,8 +75,8 @@ ALTERNATIVE: Option B — resty; third-party client with built-in retries
 ```
 
 The panelist overturned the recommendation and named a concrete alternative
-(`Option B`) — exactly the adversarial second opinion the panel exists to
-surface before a `(Recommended)` option is auto-accepted.
+(`Option B`), the adversarial second opinion the panel exists to surface
+before a `(Recommended)` option is taken.
 
 ## Privacy
 

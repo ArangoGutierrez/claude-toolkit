@@ -312,11 +312,14 @@ Values:
 
 ## Acting on the directive
 
-Act on `ACTION`. The aggregator has already applied stakes (a fork is high
-stakes unless its question starts with `[reversible]` and names no outward
-or irreversible verb, even inside an identifier) and `CLAUDE_PANEL=advise`.
-Do not second-guess it. A session marks a fork reversible by starting the
-question text with `[reversible]`; see the README's Stakes section.
+Act on `ACTION`. The aggregator has already applied stakes and
+`CLAUDE_PANEL=advise`; do not second-guess it. A fork is high stakes unless
+its question starts with `[reversible]` and neither the question nor any
+option names push, merge, publish, post, send, delete, deploy, release or
+force (even inside an identifier). Other irreversible steps, such as
+dropping a table or a hard reset, are not detected, so a session tags a
+fork `[reversible]` only when undoing the choice later is cheap and nothing
+leaves the machine. See the README's Stakes section.
 
 ### `ACTION == "proceed"`
 
@@ -384,7 +387,7 @@ Each question has its own directive. Take the questions whose action is
 
 ## Cleanup
 
-After processing ALL questions (HOLD + DISSENT + ERROR paths), remove
+After processing ALL questions (whatever their action), remove
 every file this run created — **one explicit path per `rm -f` argument,
 never a glob (`*`)**. Under zsh, an unmatched glob aborts the ENTIRE
 command line, not just that argument — so a single `rm -f a b* c` where
@@ -489,10 +492,11 @@ multi-question recommendations become common (they aren't currently).
 - Do NOT write API keys to any file.
 - Do NOT modify or summarize the Agent tool's response before writing
   it to the verdict file. Write verbatim; let the aggregator parse.
-- Do NOT modify the `AskUserQuestion` call beyond augmenting question
-  text (for dissents) or swapping the marker (for ERROR or fallback).
-- Do NOT re-invoke this skill after auto-taking a HOLD recommendation.
-  The work continues as if the user picked.
+- Do NOT modify the `AskUserQuestion` call beyond appending the panel's
+  annotation (`ask_with_review`), swapping the marker (`ask_with_review`,
+  `ask` or fallback), and dropping the questions already taken.
+- Do NOT re-invoke this skill after taking a recommendation on `proceed`
+  or `proceed_noted`. The work continues as if the user picked.
 - Do NOT introduce a panelist not in `config.yml`. New panelists ship
   via `config.yml` + a persona file under `personas/<role>.md` — never
   ad-hoc in this file.

@@ -216,7 +216,7 @@ Invoke the validate-recommendation skill before asking the user. State file:
 The skill will:
   1. Dispatch enabled panelists in parallel (panel dispatch for nat-* backends; Agent tool for claude-subagent backends)
   2. Aggregate verdicts via panel aggregate (JSON directive to stdout)
-  3. Emit PANEL_VERDICT: HOLD (auto-proceed) or DISSENT (re-ask augmented) or ERROR (re-ask original)
+  3. Act on the directive's action: proceed, proceed_noted, ask_with_review or ask
 
 Skill location: .claude/skills/validate-recommendation/SKILL.md
 EOF

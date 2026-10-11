@@ -3,6 +3,8 @@
 # Detects "(Recommended)" marker in option labels; if present and not already
 # panel-flagged, writes tool_input to a session state file and blocks with
 # stderr feedback instructing Claude to invoke the validate-recommendation skill.
+# While the user is at the Mac (input idle under CLAUDE_PANEL_AWAY_AFTER
+# seconds, default 600) a marked question goes straight to them instead.
 #
 # Exit 0 = approve (let tool proceed). Exit 2 = block (stderr is feedback).
 # Fails open: any error in this script results in exit 0 + stderr log.
@@ -43,10 +45,6 @@ RECOMMENDED_LABEL=$(echo "$INPUT" \
              | select(contains("(Recommended)"))' 2>/dev/null \
     | head -n 1)
 
-if [ -z "$RECOMMENDED_LABEL" ]; then
-    exit 0
-fi
-
 # Fall back to $PPID (the spawning Claude Code process's PID) so each
 # concurrent CC session gets a unique state-file path. The literal
 # "unknown" sentinel makes the path shared, which causes session A's
@@ -63,6 +61,66 @@ CREATED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 # Trace log (default-on telemetry). Override path via $CLAUDE_PANEL_TRACE_LOG.
 TRACE_LOG="${CLAUDE_PANEL_TRACE_LOG:-$HOME/.claude/debug/panel-trace.log}"
 mkdir -p "$(dirname "$TRACE_LOG")" 2>/dev/null
+
+# Presence: the panel stands in for the user while they are away, so while
+# they are using the Mac a marked question goes straight to them. The signal
+# is the Mac's input idle time, IOHIDSystem's HIDIdleTime in nanoseconds: any
+# keyboard or mouse input, in any app or session, resets it. Idle under
+# CLAUDE_PANEL_AWAY_AFTER seconds (default 600) is present. When it cannot be
+# read (not macOS, no ioreg, missing, garbled or out-of-range output) the
+# decision is "unknown" and the
+# panel runs, as it did before this check existed; an unreadable value must
+# never become 0 s, which would read as present and skip the panel silently.
+# Every AskUserQuestion logs one presence line, marked or not, so the
+# threshold can be tuned against answer times in the transcripts.
+AWAY_AFTER="${CLAUDE_PANEL_AWAY_AFTER:-600}"
+if ! [[ "$AWAY_AFTER" =~ ^[0-9]+$ ]]; then
+    AWAY_AFTER=600
+fi
+HID_IDLE=""
+if command -v ioreg >/dev/null 2>&1; then
+    HID_NS=$(ioreg -c IOHIDSystem 2>/dev/null | awk '/"HIDIdleTime"/ {print $NF; exit}')
+    # At most 18 digits (about 31 years): bash arithmetic wraps above 2^63,
+    # and UINT64_MAX would divide to 0 s.
+    if [[ "$HID_NS" =~ ^[0-9]{1,18}$ ]]; then
+        HID_IDLE=$((HID_NS / 1000000000))
+    fi
+fi
+
+if [ -z "$RECOMMENDED_LABEL" ]; then
+    MARKED=0
+    DECISION="-"
+elif [ -z "$HID_IDLE" ]; then
+    MARKED=1
+    DECISION=unknown
+elif [ "$HID_IDLE" -lt "$AWAY_AFTER" ]; then
+    MARKED=1
+    DECISION=present
+    # Advise mode asks for the panel's commentary on every marked question
+    # while the user answers, so being present does not skip it there.
+    if [ "${CLAUDE_PANEL:-on}" = "advise" ]; then
+        DECISION=advise
+    fi
+else
+    MARKED=1
+    DECISION=away
+fi
+
+UUID=$(echo "$INPUT" | jq -r '.session_id // "-"' 2>/dev/null)
+echo "[$CREATED] event=presence session=$SID uuid=${UUID:--} hid_idle=${HID_IDLE:-na} marked=$MARKED decision=$DECISION" \
+    >> "$TRACE_LOG" 2>/dev/null || true
+
+if [ -z "$RECOMMENDED_LABEL" ]; then
+    exit 0
+fi
+
+# Present: the question goes straight to the user. This session's leftover
+# state file goes too, or the re-entry guard below would read the next away
+# question, inside its 600 s window, as a same-flight re-issue.
+if [ "$DECISION" = "present" ]; then
+    rm -f "$STATE_FILE"
+    exit 0
+fi
 
 # Re-entry guard: if a state file already exists for this session, decide
 # based on its AGE whether this is a same-flight re-issue or a genuinely

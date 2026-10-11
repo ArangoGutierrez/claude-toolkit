@@ -128,6 +128,14 @@ def test_an_unusable_question_file_is_high_stakes(tmp_path, raw):
         "high", "no_question", "ask_with_review")
 
 
+def test_a_question_file_that_does_not_exist_is_high_stakes(tmp_path):
+    # The path SKILL.md passes can drift away from the file step 1 wrote.
+    cfg, work = _panel(tmp_path, 0)
+    out = json.loads(aggregate(cfg, work, LABEL_A, question_file=str(tmp_path / "missing.json")))
+    assert (out["stakes"], out["stakes_reason"], out["action"]) == (
+        "high", "no_question", "ask_with_review")
+
+
 def test_advise_mode_asks_even_when_reversible(tmp_path, monkeypatch):
     monkeypatch.setenv("CLAUDE_PANEL", "advise")
     out = _run(tmp_path, 0, "[reversible] Which cache layout?")

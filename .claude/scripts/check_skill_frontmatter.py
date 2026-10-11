@@ -51,6 +51,7 @@ KEY_ADVICE = {
 }
 NAME_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 TOP_KEY_RE = re.compile(r"^([A-Za-z0-9_.-]+):(.*)$")
+NESTED_KEY_RE = re.compile(r"^[A-Za-z0-9_.-]+:(\s|$)")
 CUE_RE = re.compile(
     r"\b(use (only |this |it )?when|use (this|for|to)|triggers? (on|when|by)"
     r"|triggered by|trigger with|when the user)\b",
@@ -119,8 +120,12 @@ def check_text(path, text):
             first_line[key] = line
 
     for key, line, parts in entries:
-        first = parts[0]
+        # A plain value may start on the line after its key. So may a list or a
+        # nested mapping, and those are not plain values.
+        first = next((part for part in parts if part), "")
         if not first or first.startswith(QUOTED_OR_BLOCK):
+            continue
+        if not parts[0] and (first == "-" or first.startswith("- ") or NESTED_KEY_RE.match(first)):
             continue
         joined = " ".join(part for part in parts if part)
         if ": " in joined:  # rule:E2

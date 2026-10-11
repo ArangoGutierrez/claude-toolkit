@@ -26,6 +26,10 @@ case "$TMP" in
    *) echo "$NAME: FAIL $DASH mktemp -d gave a non-absolute path: '$TMP'"; exit 1 ;;
 esac
 trap 'rm -rf "$TMP"' EXIT
+# The eval prints paths it resolved with cd and pwd, which collapse the "//" that
+# a TMPDIR ending in "/" (the macOS default outside the agent sandbox) leaves in
+# the mktemp result. Resolve TMP the same way so expected and actual paths match.
+TMP="$(cd "$TMP" && pwd)" || { echo "$NAME: FAIL $DASH cannot resolve the temp dir"; exit 1; }
 
 fails=0
 cases=0

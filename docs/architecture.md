@@ -406,7 +406,7 @@ graph TD
 **The three components:**
 
 - **`tool.kickoff`** turns a rough task opener into a scoped prompt, routed skills, and a verification checklist with one LLM call. Fail-open: if no model is reachable, the raw opener proceeds untouched.
-- **`panel.dispatch`** (the validate-recommendation skill) dispatches N configured panelists to review any `AskUserQuestion` carrying a `(Recommended)` option before it reaches the user.
+- **`panel.dispatch`** (the validate-recommendation skill) dispatches N configured panelists to review any `AskUserQuestion` carrying a `(Recommended)` option before it reaches the user. While the user is at the Mac the hook skips the panel and asks directly.
 - **`skills/done/eval.py`** evaluates session-goal evidence against acceptance criteria before a `/done confirm` or `/done abandon` is accepted.
 
 **The seam:** none of the three call a provider SDK directly. Each builds a request — system/user prompt, model, temperature — and hands it to `tool.backends.build_chat_model` or `invoke_llm`. The seam is the only code that knows how to construct a `nat-nim` (NVIDIA NIM), `nat-anthropic`, or `nat-openai` (any OpenAI-compatible endpoint) client, so a new call site never re-implements provider wiring.

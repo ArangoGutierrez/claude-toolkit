@@ -997,7 +997,7 @@ graph TD
 **The three components:**
 
 - **`tool.kickoff`** turns a rough task opener into a scoped prompt, routed skills, and a verification checklist with one LLM call. Fail-open: if no model is reachable, the raw opener proceeds untouched.
-- **`panel.dispatch`** (the validate-recommendation skill) dispatches N configured panelists to review any `AskUserQuestion` carrying a `(Recommended)` option before it reaches the user.
+- **`panel.dispatch`** (the validate-recommendation skill) dispatches N configured panelists to review any `AskUserQuestion` carrying a `(Recommended)` option before it reaches the user. While the user is at the Mac the hook skips the panel and asks directly.
 - **`skills/done/eval.py`** evaluates session-goal evidence against acceptance criteria before a `/done confirm` or `/done abandon` is accepted.
 
 **The seam:** none of the three call a provider SDK directly. Each builds a request — system/user prompt, model, temperature — and hands it to `tool.backends.build_chat_model` or `invoke_llm`. The seam is the only code that knows how to construct a `nat-nim` (NVIDIA NIM), `nat-anthropic`, or `nat-openai` (any OpenAI-compatible endpoint) client, so a new call site never re-implements provider wiring.
@@ -3467,12 +3467,16 @@ which trees `capture.sh`/`diff.sh` compare.
 ## What
 
 The validate-recommendation panel reviews every `AskUserQuestion` whose option
-labels carry `(Recommended)`. A `PreToolUse` hook fires the panel skill, which
-dispatches N configured panelists and produces one verdict: **HOLD**
-(auto-proceed with the recommended option), **DISSENT** (re-ask the question,
-augmented with panelist reasoning), or **ERROR** (re-ask the original
-question — a panelist failed to respond usefully). The panel's behavior is
-entirely driven by one file, `config.yml`.
+labels carry `(Recommended)`, unless the user is at the Mac: then the hook
+skips the panel and asks directly (`CLAUDE_PANEL_AWAY_AFTER`). A `PreToolUse`
+hook fires the panel skill, which dispatches N configured panelists and
+produces one verdict: **HOLD**, **DISSENT** (soft or hard), or **ERROR** (a
+panelist failed to respond usefully). The aggregator turns the verdict and
+the question's stakes into an action. A reversible fork, whose question text
+starts with `[reversible]` and names no outward verb such as push, merge or
+deploy, proceeds on HOLD and on a soft dissent (the objection is noted).
+Every high-stakes fork, every hard dissent and every ERROR goes back to the
+user. The panel's behavior is entirely driven by one file, `config.yml`.
 
 At the wire level an unblinded panelist emits HOLD or OVERTURN (see the worked
 example) and a blinded one emits a CHOICE, which the aggregator maps onto the

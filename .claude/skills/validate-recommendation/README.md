@@ -178,12 +178,14 @@ After syncing this skill to `~/.claude/`:
    ```
    Should print `on`.
 
-3. Open a fresh Claude Code session.
+3. Open a fresh Claude Code session with `CLAUDE_PANEL_AWAY_AFTER=0 claude`.
+   While you are at the Mac the hook otherwise sends a marked question
+   straight to you and no panel runs.
 
 4. Prompt the assistant for a recommendation that triggers
    `AskUserQuestion`, e.g.:
    > "Recommend an HTTP client for a Go service that needs retries.
-   > Show 3 options."
+   > Show 3 options, and start the question with [reversible]."
 
 5. Verify behavior:
    - The assistant should announce that it's running the panel before
@@ -191,8 +193,11 @@ After syncing this skill to `~/.claude/`:
    - On HOLD: the assistant prints the panel rationales and proceeds
      without showing the question. You never see the `AskUserQuestion`
      UI for that decision.
-   - On DISSENT: the question shows up with a `**Panel review:**` line
-     appended.
+   - On a soft dissent: it proceeds and prints the objection.
+   - On a hard dissent: the question shows up with a
+     `Panel HARD-DISSENT:` line appended.
+   - Without the `[reversible]` tag every verdict shows you the question,
+     with the panel's review attached.
 
 6. Inspect the trace log:
    ```bash

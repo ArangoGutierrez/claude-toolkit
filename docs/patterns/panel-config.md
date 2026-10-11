@@ -3,12 +3,16 @@
 ## What
 
 The validate-recommendation panel reviews every `AskUserQuestion` whose option
-labels carry `(Recommended)`. A `PreToolUse` hook fires the panel skill, which
-dispatches N configured panelists and produces one verdict: **HOLD**
-(auto-proceed with the recommended option), **DISSENT** (re-ask the question,
-augmented with panelist reasoning), or **ERROR** (re-ask the original
-question — a panelist failed to respond usefully). The panel's behavior is
-entirely driven by one file, `config.yml`.
+labels carry `(Recommended)`, unless the user is at the Mac: then the hook
+skips the panel and asks directly (`CLAUDE_PANEL_AWAY_AFTER`). A `PreToolUse`
+hook fires the panel skill, which dispatches N configured panelists and
+produces one verdict: **HOLD**, **DISSENT** (soft or hard), or **ERROR** (a
+panelist failed to respond usefully). The aggregator turns the verdict and
+the question's stakes into an action. A reversible fork, whose question text
+starts with `[reversible]` and names no outward verb such as push, merge or
+deploy, proceeds on HOLD and on a soft dissent (the objection is noted).
+Every high-stakes fork, every hard dissent and every ERROR goes back to the
+user. The panel's behavior is entirely driven by one file, `config.yml`.
 
 At the wire level an unblinded panelist emits HOLD or OVERTURN (see the worked
 example) and a blinded one emits a CHOICE, which the aggregator maps onto the

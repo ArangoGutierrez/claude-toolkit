@@ -3,7 +3,7 @@
 set -o pipefail
 
 HOOK="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/validate-recommendation.sh"
-TMP=$(mktemp -d)
+TMP=$(mktemp -d "${TMPDIR:-/tmp}/hooktest.XXXXXX")
 trap "rm -rf $TMP" EXIT
 
 # Isolate the trace log so tests don't pollute ~/.claude/debug/.
@@ -228,7 +228,12 @@ exit 1
 FAKESTAT
 chmod +x "$FAKEBIN/stat"
 
-run_hook "$INPUT" "PATH=$FAKEBIN:$PATH" "t11" >/dev/null 2>&1 && RC=0 || RC=$?
+# A minimal, space-free PATH. run_hook passes $envs to `env` UNQUOTED so that
+# multiple KEY=VAL pairs split correctly — which means a value containing a
+# space splits too. This machine's PATH holds six "Application Support/..."
+# entries, so $FAKEBIN:$PATH made env try to run "Support/Claude/..." and
+# return 127, a false failure that looked like the hook crashing.
+run_hook "$INPUT" "PATH=$FAKEBIN:/usr/bin:/bin:/usr/sbin:/sbin" "t11" >/dev/null 2>&1 && RC=0 || RC=$?
 if [ "$RC" != "0" ]; then
     echo "FAIL test11 unreadable mtime: expected exit 0 (fail-open bypass), got $RC"
     exit 1

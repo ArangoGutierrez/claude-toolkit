@@ -101,6 +101,13 @@ skill "$t" .claude/skills good-skill 'name: good-skill' 'description: Use when a
 rm "$t/.claude/scripts/check_skill_frontmatter.py"
 expect no-checker "$t" 1 "$V FAIL $DASH checker missing: $t/.claude/scripts/check_skill_frontmatter.py"
 
+# The checker exits 2 on a file it cannot read, here one that is not UTF-8; the
+# eval must report that as a FAIL, never as a PASS.
+t="$(new_tree checker-exit-2)"
+mkdir -p "$t/.claude/skills/latin-skill"
+printf -- '---\nname: latin-skill\ndescription: Use when asked \351\n---\nBody.\n' > "$t/.claude/skills/latin-skill/SKILL.md"
+expect checker-exit-2 "$t" 1 "$V FAIL $DASH checker exited rc=2"
+
 # PyYAML missing: a PATH shim makes `python3 -c 'import yaml'` fail, which
 # fails the same way outside the agent sandbox as inside it.
 t="$(new_tree no-pyyaml)"

@@ -56,5 +56,8 @@ jobs:
       - name: Mutation-check the checker's tests
         run: bash .claude/scripts/check_skill_frontmatter_mutants.sh
 
+      - name: Test the eval
+        run: bash .claude/evals/skill-frontmatter_test.sh
+
       - name: Check every SKILL.md
         run: bash .claude/evals/skill-frontmatter.sh

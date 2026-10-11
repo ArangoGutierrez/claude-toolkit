@@ -5,6 +5,7 @@ exact output lines and exit code. Test names carry the rule code
 (test_rule_e3_...) so check_skill_frontmatter_mutants.sh can select one rule's
 tests with -k rule_e3.
 """
+import importlib.util
 import os
 import subprocess
 import sys
@@ -29,6 +30,15 @@ def run(*args):
     proc = subprocess.run([sys.executable, SCRIPT] + [str(arg) for arg in args],
                           capture_output=True, text=True)
     return proc.returncode, proc.stdout.splitlines(), proc.stderr
+
+
+def load_checker():
+    """Import the checker from SCRIPT without leaving a __pycache__ beside it."""
+    sys.dont_write_bytecode = True
+    spec = importlib.util.spec_from_file_location("check_skill_frontmatter", SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 def test_clean_skill_with_every_allowed_key_passes(tmp_path):
@@ -147,6 +157,13 @@ def test_crlf_line_endings_pass(tmp_path):
     assert run(tmp_path) == (0, [SUMMARY_CLEAN], "")
 
 
+def test_crlf_text_passes_check_text_directly():
+    # The CLI reads files in text mode, which turns CRLF into LF before check_text
+    # sees it; a caller that passes in-memory text (the hook) does not.
+    text = "---\r\nname: crlf-skill\r\ndescription: Use when asked.\r\n---\r\nBody.\r\n"
+    assert load_checker().check_text("/skills/crlf-skill/SKILL.md", text) == []
+
+
 def test_non_utf8_file_exits_2_naming_it(tmp_path):
     skill_dir = tmp_path / "latin-skill"
     skill_dir.mkdir()
@@ -183,6 +200,21 @@ def test_rule_e2_hash_cuts_the_value(tmp_path):
                "and cuts the value; quote the whole value",
         path + ":3: W1 description has no selection cue; add a 'Use when ...' clause",
         "1 errors, 1 warnings, 1 files checked",
+    ])
+
+
+def test_rule_e2_hash_in_a_value_on_the_next_line(tmp_path):
+    # A plain value may start on the line after its key; ' #' cuts it the same way.
+    path = write_skill(tmp_path, "nextline-skill", (
+        "name: nextline-skill\n"
+        "description:\n"
+        "  Use when asked about the #ops channel.\n"
+    ))
+    rc, out, _ = run(tmp_path)
+    assert (rc, out) == (1, [
+        path + ":3: E2 description: value contains ' #', which starts a YAML comment "
+               "and cuts the value; quote the whole value",
+        SUMMARY_ONE_ERROR,
     ])
 
 
@@ -244,6 +276,13 @@ def test_rule_e4_missing_description(tmp_path):
     assert (rc, out) == (1, [path + ":1: E4 description is missing or empty", SUMMARY_ONE_ERROR])
 
 
+@pytest.mark.parametrize("value", ['""', "' '"])
+def test_rule_e4_empty_description(tmp_path, value):
+    path = write_skill(tmp_path, "empty-skill", "name: empty-skill\ndescription: " + value + "\n")
+    rc, out, _ = run(tmp_path)
+    assert (rc, out) == (1, [path + ":3: E4 description is missing or empty", SUMMARY_ONE_ERROR])
+
+
 @pytest.mark.parametrize("key, advice", [
     ("tools", "not a skill key (subagent syntax) and nothing reads it; delete it, "
               "or use allowed-tools / disallowed-tools"),
@@ -299,6 +338,16 @@ def test_rule_e6_allowed_tools_commas(tmp_path):
     rc, out, _ = run(tmp_path)
     assert (rc, out) == (1, [
         path + ":4: E6 allowed-tools is comma-separated; separate tools with spaces",
+        SUMMARY_ONE_ERROR,
+    ])
+
+
+def test_rule_e6_allowed_tools_not_a_string(tmp_path):
+    path = write_skill(tmp_path, "number-tools",
+                       "name: number-tools\ndescription: Use when asked.\nallowed-tools: 5\n")
+    rc, out, _ = run(tmp_path)
+    assert (rc, out) == (1, [
+        path + ":4: E6 allowed-tools must be a space-separated string",
         SUMMARY_ONE_ERROR,
     ])
 

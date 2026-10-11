@@ -3,10 +3,6 @@ name: k8s-debug
 description: Structured Kubernetes debugging for GPU workloads. Triggered by "pod crash", "CrashLoopBackOff", "OOMKilled", "GPU scheduling", or /k8s-debug
 disable-model-invocation: true
 user-invocable: true
-tools:
-  - Read
-  - Bash
-  - Grep
 ---
 
 # K8s Debug — GPU Workload Triage

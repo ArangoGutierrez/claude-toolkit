@@ -2,12 +2,6 @@
 name: config-audit
 description: Audit your own .claude config surface (skills/hooks/MCP/settings) for secrets, injection sinks, over-broad permissions, and hook hygiene. Triggered by "audit my config", "scan .claude", or /config-audit
 user-invocable: true
-tools:
-  - Read
-  - Grep
-  - Glob
-  - Bash
-  - Edit
 ---
 
 # Config Audit — Self-Audit of the Agent Surface

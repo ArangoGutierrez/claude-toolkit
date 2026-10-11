@@ -2,10 +2,6 @@
 name: goal
 description: Capture or amend the session goal. The goal file at ~/.claude/audit/session-goals/<uuid>.md records the active goal and acceptance criteria for the session. Triggered by /goal, or by user phrases like "set session goal", "amend goal".
 user-invocable: true
-tools:
-  - Read
-  - Write
-  - Bash
 ---
 
 # /goal

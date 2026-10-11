@@ -9,10 +9,6 @@ description: >
   model is reachable or the engine is unavailable, the raw idea proceeds
   untouched.
 argument-hint: <rough idea>
-tools:
-  - Bash
-  - Skill
-  - Read
 ---
 
 # kickoff — agentic LLM front door

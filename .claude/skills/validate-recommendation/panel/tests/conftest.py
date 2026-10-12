@@ -31,7 +31,7 @@ def trace_log(tmp_path_factory, monkeypatch):
     aggregate() appends a verdict line through panel.trace, which DEFAULTS
     to the operator's real '~/.claude/debug/panel-trace.log'. Tests that
     call aggregate() without setting $CLAUDE_PANEL_TRACE_LOG themselves
-    (test_aggregate, test_cli_aggregate, test_telemetry) would otherwise
+    (e.g. test_aggregate, test_cli_aggregate, test_telemetry) would otherwise
     append to that real file. Same approach as decisions_log; a test that
     sets the variable itself still overrides this. Returns the path so
     tests can assert on the written line.

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import os
 import textwrap
+from pathlib import Path
 
 from panel.aggregate import aggregate
 from panel.cli import main
@@ -147,6 +148,25 @@ def test_aggregate_record_fields_match_directive(decisions_log, tmp_path):
     assert rec["verdict"] == directive["verdict"]
     assert rec["rationale_gate_passed"] == directive["rationale_gate_passed"]
     assert [p["verdict"] for p in rec["panelists"]] == [p["verdict"] for p in directive["panelists"]]
+
+
+def test_aggregate_trace_line_stays_out_of_the_operator_log(tmp_path, tmp_path_factory, monkeypatch):
+    """aggregate() also appends a verdict line through panel.trace, whose
+    default is the operator's real ~/.claude/debug/panel-trace.log. The
+    sentinel stands in for that default, so a suite that stops redirecting
+    $CLAUDE_PANEL_TRACE_LOG fails here instead of appending to the real log."""
+    sentinel = tmp_path / "operator-panel-trace.log"
+    monkeypatch.setattr("panel.trace.DEFAULT_TRACE_LOG", sentinel)
+    cfg = _hold_config(tmp_path)
+    vdir = tmp_path / "verdicts"
+    _write_verdict(vdir, "da-test", "HOLD", "A holds; nothing stronger found.", "n/a")
+
+    aggregate(str(cfg), str(vdir), "Option A (Recommended)")
+
+    assert not sentinel.exists()
+    redirect = Path(os.environ.get("CLAUDE_PANEL_TRACE_LOG", ""))
+    assert redirect.is_relative_to(tmp_path_factory.getbasetemp())  # a pytest tmp file, never an operator path
+    assert "outcome=HOLD" in redirect.read_text(encoding="utf-8")  # written, just not to the operator log
 
 
 def test_aggregate_unwritable_telemetry_still_emits_directive(tmp_path, monkeypatch):

@@ -139,3 +139,22 @@ def test_scanner_flags_a_missing_cd_in_prose_as_well_as_in_a_block():
     assert "stats" in joined, "missed an unguarded call in prose"
     assert "dispatch" not in joined, "flagged a block call whose cd is earlier in the block"
     assert "lint-config" not in joined, "flagged a prose call that carries its own cd"
+
+
+def test_every_question_file_flag_names_the_step_1_payload():
+    """Every step that reads the question must read the file step 1 writes.
+
+    If the aggregate path drifts, `panel aggregate` finds no question and
+    classifies every fork high stakes, so the reversible path stops working
+    without any error. This pins the path text; at run time the match also
+    relies on step 4 exporting the session id the state file is named with.
+    """
+    text = SKILL_MD.read_text(encoding="utf-8")
+    qpayload = re.search(r'^QPAYLOAD="([^"]+)"$', text, re.M)
+    assert qpayload, "SKILL.md no longer defines QPAYLOAD"
+    paths = re.findall(r'--question-file "([^"]+)"', text)
+    assert paths, "SKILL.md passes no --question-file at all"
+    assert all(p in ("$QPAYLOAD", qpayload.group(1)) for p in paths), paths
+    aggregate_call = text[text.index("-m panel aggregate"):]
+    aggregate_call = aggregate_call[:aggregate_call.index("```")]
+    assert "--question-file" in aggregate_call, "panel aggregate gets no question file"

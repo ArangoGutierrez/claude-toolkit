@@ -145,7 +145,7 @@ Workers follow TDD (Red → Green → Refactor). Discipline is skill-driven (the
    - Address: real bugs, security → Worker must fix
    - Ignore: false positives → document reason
    - Discuss: needs user input → escalate to Lead
-   - **Panel hook-point (A/B):** when a "Discuss" item is a genuine design fork (architecture, security posture, API shape, irreversible/outward-facing — never trivial reversible choices), the PE/Lead surfaces it as an `AskUserQuestion` with one `(Recommended)` option (reasoning in the descriptions). If you run a recommendation-review panel, handle its verdict: HOLD → Lead proceeds with the recommended option; DISSENT → queue the augmented question for the user; ERROR → re-ask original. Workers never emit panel questions — they escalate to the PE.
+   - **Panel hook-point (A/B):** when a "Discuss" item is a genuine design fork (architecture, security posture, API shape, irreversible/outward-facing; never trivial reversible choices such as naming, ordering or formatting), the PE/Lead surfaces it as an `AskUserQuestion` with one `(Recommended)` option (reasoning in the descriptions). Start the question text with `[reversible]` only when undoing the choice later is cheap and nothing leaves the machine; an untagged fork is high stakes and always reaches the user. If you run a recommendation-review panel, act on its directive's `action`: `proceed` → Lead proceeds with the recommended option; `proceed_noted` → Lead proceeds and lists the objection in the final summary; `ask_with_review` → queue the augmented question for the user; `ask` → re-ask original. Workers never emit panel questions; they escalate to the PE.
 
 4. **Worker addresses feedback**, pushes fixes
 

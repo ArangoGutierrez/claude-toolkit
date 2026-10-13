@@ -20,6 +20,7 @@ from panel.severity import decide, ParsedVerdict
 from panel.verdict import parse_verdict_file
 from panel.trace import log_verdict
 from panel.telemetry import append_decision
+from panel.stakes import Stakes, action as stakes_action, classify
 
 
 def aggregate(
@@ -27,6 +28,7 @@ def aggregate(
     verdicts_dir: str,
     recommended_label: str,
     question_id: str | None = None,
+    question_file: str | None = None,
 ) -> str:
     """Build the JSON directive from per-panelist verdict files.
 
@@ -40,6 +42,10 @@ def aggregate(
     `question_id` is an optional canonical identifier threaded into the
     decisions.jsonl telemetry row so a future user_pick/label event can
     join to it; it is null when the caller does not supply one.
+
+    `question_file` is the build-prompt question payload. The stakes policy
+    classifies it and adds `stakes`, `stakes_reason` and `action` to the
+    directive; without a readable file the fork is high stakes.
     """
     cfg = load_config(config_path)
     enabled = [p for p in cfg.panelists if p.enabled]
@@ -69,10 +75,16 @@ def aggregate(
         ))
 
     directive = decide(cfg, parsed, cycle=None)
-    log_verdict(directive.verdict, _trace_line(directive))
-    _record_decision(cfg, directive, recommended_label, question_id)
+    stakes = _question_stakes(question_file)
+    act = stakes_action(directive.verdict, stakes.level, os.environ.get("CLAUDE_PANEL", "on"))
+    # action and stakes go first: log_verdict keeps only 160 characters.
+    log_verdict(directive.verdict,
+                f"action={act} stakes={stakes.level} {_trace_line(directive)}")
+    _record_decision(cfg, directive, recommended_label, question_id,
+                     stakes=stakes, act=act)
 
     payload = _to_serializable_dict(directive)
+    payload.update(stakes=stakes.level, stakes_reason=stakes.reason, action=act)
     return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
 
 
@@ -93,7 +105,10 @@ def _map_blinded_choice(v, recommended_label: str):
     return "OVERTURN", v.rationale, choice
 
 
-def _record_decision(cfg, directive, recommended_label: str, question_id: str | None) -> None:
+def _record_decision(
+    cfg, directive, recommended_label: str, question_id: str | None,
+    stakes: Stakes | None = None, act: str | None = None,
+) -> None:
     """Append one decision row to decisions.jsonl. Best-effort.
 
     Wrapped so ANY failure (serialization, an unexpected directive shape,
@@ -114,6 +129,10 @@ def _record_decision(cfg, directive, recommended_label: str, question_id: str | 
                 for p in directive.panelists
             ],
         }
+        if stakes is not None:
+            record["stakes"] = stakes.level
+            record["stakes_reason"] = stakes.reason
+            record["action"] = act
         append_decision(record, cfg.telemetry.jsonl)
     except Exception as exc:  # noqa: BLE001 — telemetry is best-effort; never break the directive
         print(f"panel: telemetry write skipped ({exc})", file=sys.stderr)
@@ -136,3 +155,15 @@ def _trace_line(directive) -> str:
     for p in directive.panelists:
         parts.append(f"{p.id}={p.verdict}")
     return " ".join(parts) if parts else "no-panelists"
+
+
+def _question_stakes(question_file: str | None) -> Stakes:
+    """Stakes of the question being aggregated. Anything unreadable is high:
+    the policy must fail toward asking the user, never toward proceeding."""
+    if not question_file:
+        return Stakes("high", "no_question")
+    try:
+        payload = json.loads(Path(question_file).expanduser().read_text(encoding="utf-8"))
+        return classify(payload)
+    except Exception:  # noqa: BLE001 - fail toward asking the user
+        return Stakes("high", "no_question")

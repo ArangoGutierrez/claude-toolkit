@@ -97,6 +97,10 @@ def main(argv: list[str] | None = None) -> int:
         "--question-id", default=None,
         help="Optional canonical id for this question; recorded in the decisions.jsonl telemetry row for later join",
     )
+    agg.add_argument(
+        "--question-file", default=None,
+        help="Build-prompt question payload; the stakes policy classifies it (missing or unreadable means high stakes)",
+    )
 
     lint = sub.add_parser("lint-config", help="Validate panel config.yml")
     lint.add_argument(
@@ -148,6 +152,7 @@ def main(argv: list[str] | None = None) -> int:
         print(aggregate(
             str(cfg_path), args.verdicts_dir, args.recommended_label,
             question_id=args.question_id,
+            question_file=args.question_file,
         ))
         return 0
 

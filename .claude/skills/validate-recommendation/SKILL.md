@@ -280,10 +280,13 @@ DIRECTIVE_JSON=$(export CLAUDE_SESSION_ID="$(jq -r '.session_id' "${TMPDIR:-/tmp
     "${CLAUDE_PANEL_PYTHON:-python3.12}" -m panel aggregate \
     --config "${CONFIG_RESOLVED:-$CONFIG}" \
     --verdicts-dir "$WORKDIR" \
-    --recommended-label "<recommended_label from state for THIS question>")
+    --recommended-label "<recommended_label from state for THIS question>" \
+    --question-file "${TMPDIR:-/tmp}/panel-question-${CLAUDE_SESSION_ID:-$PPID}-q<N>.json")
 ```
 
 Capture stdout into `$DIRECTIVE_JSON`. It's a single-line JSON object.
+`--question-file` is the step 1 payload: the aggregator classifies the
+question's stakes from it, and without it the fork is high stakes.
 
 ### 5. Parse the directive
 
@@ -294,6 +297,8 @@ VERDICT=$(jq -r '.verdict' <<< "$DIRECTIVE_JSON")
 SUMMARY=$(jq -r '.summary' <<< "$DIRECTIVE_JSON")
 ESCALATE=$(jq -r '.escalate_to_user // false' <<< "$DIRECTIVE_JSON")
 GATE=$(jq -r '.rationale_gate_passed' <<< "$DIRECTIVE_JSON")
+ACTION=$(jq -r '.action // empty' <<< "$DIRECTIVE_JSON")
+STAKES=$(jq -r '.stakes // empty' <<< "$DIRECTIVE_JSON")
 ```
 
 Values:
@@ -301,16 +306,22 @@ Values:
 - `SUMMARY` — one-line user-facing text, already sanitized
 - `ESCALATE` — `true` for HARD-DISSENT in Phase 3c, `false` otherwise
 - `GATE` — `true`/`false`/`null` per the rationale gate semantics
+- `ACTION` ∈ `{proceed, proceed_noted, ask_with_review, ask}`; empty only
+  from an older aggregator
+- `STAKES` ∈ `{reversible, high}`
 
 ## Acting on the directive
 
-Behavior matrix:
+Act on `ACTION`. The aggregator has already applied stakes and
+`CLAUDE_PANEL=advise`; do not second-guess it. A fork is high stakes unless
+its question starts with `[reversible]` and neither the question nor any
+option names push, merge, publish, post, send, delete, deploy, release or
+force (even inside an identifier). Other irreversible steps, such as
+dropping a table or a hard reset, are not detected, so a session tags a
+fork `[reversible]` only when undoing the choice later is cheap and nothing
+leaves the machine. See the README's Stakes section.
 
-### `VERDICT == "HOLD"`
-
-Behavior depends on `${CLAUDE_PANEL:-on}`:
-
-**Default (`on`)** — auto-take mode:
+### `ACTION == "proceed"`
 
 The recommendation stands. Take the recommended option without asking
 the user. Print a brief message:
@@ -322,48 +333,39 @@ the user. Print a brief message:
 Then continue the work as if the user had picked the recommended
 option. The `AskUserQuestion` for this question is NEVER issued.
 
-**`advise`** — advisory mode (preserves user agency):
+### `ACTION == "proceed_noted"`
 
-Do NOT auto-take. Re-issue `AskUserQuestion` for this question with
-the panel's affirmative annotation appended. Augmented payload:
+A reversible fork with a soft dissent. Take the recommended option
+without asking the user, and print:
 
-- **Question text**: original question + two newlines +
-  `**Panel validated:** <SUMMARY>` (positive phrasing).
+> Panel: proceeding with `<recommended_label>` for "<question excerpt>";
+> objection noted.
+> <SUMMARY>
+
+Keep this line. The session's final summary must list every
+`proceed_noted` objection (question, option taken, objection) so the user
+can revisit it.
+
+### `ACTION == "ask_with_review"`
+
+Re-issue `AskUserQuestion` for this question with the panel's review
+attached. Augmented payload:
+
+- **Question text**: original question + two newlines + the annotation
+  for the verdict:
+  - `HOLD`: `**Panel validated:** <SUMMARY>`
+  - `SOFT-DISSENT`: `<SUMMARY>` verbatim (the `**Panel review:**` line)
+  - `HARD-DISSENT`: `Panel HARD-DISSENT: <SUMMARY>`
 - **Options**: identical, EXCEPT the recommended option's label has
   `(Recommended)` swapped for `(Recommended; Panel-flagged)`. The hook
   detects this marker and skips the panel on the re-ask.
 
-### `VERDICT == "SOFT-DISSENT"`
-
-Re-issue `AskUserQuestion` for this question. Augmented payload:
-
-- **Question text**: original + two newlines + `<SUMMARY>` (the
-  `**Panel review:**` line). Use it verbatim.
-- **Options**: identical, EXCEPT the recommended option's label is
-  swapped to `(Recommended; Panel-flagged)`.
-
-### `VERDICT == "HARD-DISSENT"`
-
-In Phase 3c, HARD-DISSENT also escalates to the user (Phase 5 will add
-re-think cycles). Same payload as SOFT-DISSENT, but include severity
-in the augmented note:
-
-- **Question text**: original + two newlines + `Panel HARD-DISSENT:
-  <SUMMARY>` (severity-clear prefix).
-- **Options**: identical, EXCEPT marker swap to
-  `(Recommended; Panel-flagged)`.
-
-When Phase 5 lands, this branch will check `re_brainstorm` in the
-directive and emit a re-think markdown directive (no `AskUserQuestion`)
-when present. Until then, every HARD-DISSENT escalates the question to
-the user with full panel feedback.
-
-### `VERDICT == "ERROR"`
+### `ACTION == "ask"`
 
 Something went wrong (panelist backend down, malformed responses,
 missing files, aggregator parse error). For this question, re-issue
-the original `AskUserQuestion` unmodified — same options, same
-`(Recommended)` marker — BUT swap the marker to
+the original `AskUserQuestion` unmodified (same options, same
+`(Recommended)` marker) BUT swap the marker to
 `(Recommended; Panel-flagged)` for loop safety.
 
 Print a brief explanation:
@@ -371,9 +373,21 @@ Print a brief explanation:
 > Panel evaluation failed for "<question excerpt>" (see hook trace
 > for detail). Asking the question directly.
 
+### `ACTION` empty (older aggregator)
+
+Map the verdict instead: `HOLD` is `proceed` (`ask_with_review` when
+`CLAUDE_PANEL=advise`), `SOFT-DISSENT` and `HARD-DISSENT` are
+`ask_with_review`, and `ERROR` is `ask`.
+
+### Several questions in one call
+
+Each question has its own directive. Take the questions whose action is
+`proceed` or `proceed_noted`, and re-ask the rest together in one
+`AskUserQuestion`.
+
 ## Cleanup
 
-After processing ALL questions (HOLD + DISSENT + ERROR paths), remove
+After processing ALL questions (whatever their action), remove
 every file this run created — **one explicit path per `rm -f` argument,
 never a glob (`*`)**. Under zsh, an unmatched glob aborts the ENTIRE
 command line, not just that argument — so a single `rm -f a b* c` where
@@ -478,10 +492,11 @@ multi-question recommendations become common (they aren't currently).
 - Do NOT write API keys to any file.
 - Do NOT modify or summarize the Agent tool's response before writing
   it to the verdict file. Write verbatim; let the aggregator parse.
-- Do NOT modify the `AskUserQuestion` call beyond augmenting question
-  text (for dissents) or swapping the marker (for ERROR or fallback).
-- Do NOT re-invoke this skill after auto-taking a HOLD recommendation.
-  The work continues as if the user picked.
+- Do NOT modify the `AskUserQuestion` call beyond appending the panel's
+  annotation (`ask_with_review`), swapping the marker (`ask_with_review`,
+  `ask` or fallback), and dropping the questions already taken.
+- Do NOT re-invoke this skill after taking a recommendation on `proceed`
+  or `proceed_noted`. The work continues as if the user picked.
 - Do NOT introduce a panelist not in `config.yml`. New panelists ship
   via `config.yml` + a persona file under `personas/<role>.md` — never
   ad-hoc in this file.

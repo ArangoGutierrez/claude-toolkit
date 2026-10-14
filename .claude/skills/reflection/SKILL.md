@@ -2,13 +2,6 @@
 name: reflection
 description: Analyze session patterns, capture mistakes, curate rules. Unified learning loop. Triggered by "analyze session", "what did I learn", "improve CLAUDE.md", or /reflection
 user-invocable: true
-tools:
-  - Read
-  - Grep
-  - Glob
-  - Bash
-  - Edit
-  - Write
 ---
 
 # Reflection — Unified Learning Loop

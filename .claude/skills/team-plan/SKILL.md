@@ -1,6 +1,6 @@
 ---
 name: team-plan
-description: Use when starting a new multi-task project requiring agent team coordination on agents-workbench branch
+description: Use when starting a new multi-task project requiring agent team coordination on the agents-workbench branch. Takes the project description as its argument (/team-plan <project-description>).
 user-invocable: true
 argument-hint: <project-description>
 ---

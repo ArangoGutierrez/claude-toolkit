@@ -2,9 +2,6 @@
 name: done
 description: Confirm or abandon the session goal with NAT-backed evidence evaluation. Triggered by /done, /done confirm, /done abandon <reason>, /done amend <text>, /done override [reason].
 user-invocable: true
-tools:
-  - Bash
-  - Read
 ---
 
 # /done

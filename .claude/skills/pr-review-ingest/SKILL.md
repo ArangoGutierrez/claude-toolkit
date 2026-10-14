@@ -2,11 +2,6 @@
 name: pr-review-ingest
 description: Learn from PR review feedback — classify comments, propose rule updates. Triggered by "learn from PR", "review feedback", or /pr-review-ingest
 user-invocable: true
-tools:
-  - Read
-  - Grep
-  - Bash
-  - Edit
 ---
 
 # PR Review Ingest

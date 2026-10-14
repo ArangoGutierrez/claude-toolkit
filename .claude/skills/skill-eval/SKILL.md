@@ -9,9 +9,6 @@ description: >
   mis-trigger regressions. Triggered by /skill-eval [skill ...]. Not for
   measuring output correctness or running skills for their side effects.
 argument-hint: "[skill ...]"
-tools:
-  - Bash
-  - Read
 ---
 
 # skill-eval

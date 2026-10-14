@@ -3,10 +3,6 @@ name: eureka
 disable-model-invocation: true
 description: Capture technical breakthroughs as structured documents. Triggered by "breakthrough", "key insight", "document discovery", or /eureka
 user-invocable: true
-tools:
-  - Read
-  - Write
-  - Edit
 ---
 
 # Eureka — Breakthrough Capture

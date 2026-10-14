@@ -2,12 +2,7 @@
 name: pr-review
 description: Review a pull request and post the findings as one GitHub review, approving it when nothing blocks, in a friendly, technical tone with no emojis, no AI lingo, no severity tags and no narration of the review itself. Triggered by /pr-review [<pr-number-or-url>], "review this PR and post comments".
 user-invocable: true
-allowed-tools:
-  - Bash
-  - Read
-  - Grep
-  - Glob
-  - Agent
+allowed-tools: Bash Read Grep Glob Agent
 ---
 
 # PR Review

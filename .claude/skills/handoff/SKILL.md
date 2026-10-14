@@ -2,11 +2,6 @@
 name: handoff
 description: Generate a structured handoff prompt to start a fresh session with full context. Use ONLY when the user explicitly requests a handoff (or asks to wrap up/end the session); never invoke it on your own judgment because a task finished or context feels long. `/handoff --epic` instead produces an epic-launch brief for a session that must drive a large goal to completion autonomously.
 user-invocable: true
-tools:
-  - Bash
-  - Read
-  - Write
-  - Agent
 ---
 
 # Session Handoff

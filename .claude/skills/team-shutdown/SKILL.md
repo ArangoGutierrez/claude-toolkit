@@ -1,6 +1,6 @@
 ---
 name: team-shutdown
-description: Use when all team tasks are complete or abandoned and team infrastructure, worktrees, and AGENTS.md need cleanup
+description: Use when all team tasks are complete or abandoned and team infrastructure, worktrees, and AGENTS.md need cleanup. Takes the project name as its argument (/team-shutdown <project-name>).
 disable-model-invocation: true
 user-invocable: true
 argument-hint: <project-name>

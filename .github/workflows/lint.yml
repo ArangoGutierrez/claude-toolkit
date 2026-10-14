@@ -35,3 +35,29 @@ jobs:
         uses: crate-ci/typos@bee27e3a4fd1ea2111cf90ab89cd076c870fce14 # v1.48.0
         with:
           config: .typos.toml
+
+  skill-frontmatter:
+    name: Skill Frontmatter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: '3.12'
+
+      - name: Install checker dependencies
+        run: python -m pip install --quiet pyyaml==6.0.3 pytest==8.4.2
+
+      - name: Test the checker
+        run: python -m pytest -q .claude/scripts/check_skill_frontmatter_test.py
+
+      - name: Mutation-check the checker's tests
+        run: bash .claude/scripts/check_skill_frontmatter_mutants.sh
+
+      - name: Test the eval
+        run: bash .claude/evals/skill-frontmatter_test.sh
+
+      - name: Check every SKILL.md
+        run: bash .claude/evals/skill-frontmatter.sh

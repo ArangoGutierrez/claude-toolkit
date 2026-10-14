@@ -2,11 +2,6 @@
 name: go-review
 description: Go-specific code review — errors, concurrency, performance, idioms. Triggered by "review Go code", "Go best practices", or /go-review
 user-invocable: true
-tools:
-  - Read
-  - Grep
-  - Glob
-  - Bash
 ---
 
 # Go Review
